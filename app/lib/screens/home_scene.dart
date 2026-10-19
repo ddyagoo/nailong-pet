@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 
 import '../pet/pet_brain.dart';
 import '../services/audio_service.dart';
+import '../services/desktop_bridge.dart';
 import '../services/holiday_service.dart';
 import '../services/settings_service.dart';
 import '../services/todo_store.dart';
@@ -77,6 +78,19 @@ class _HomeSceneState extends State<HomeScene> {
 
   @override
   Widget build(BuildContext context) {
+    if (DesktopBridge.active) {
+      // Windows 桌面模式：只有奶龙，背景透明，拖动移动整个窗口
+      return Scaffold(
+        backgroundColor: Colors.transparent,
+        body: PetLayer(
+          brain: widget.brain,
+          settings: widget.settings,
+          audio: widget.audio,
+          todos: widget.todos,
+          desktop: true,
+        ),
+      );
+    }
     return Scaffold(
       body: LayoutBuilder(builder: (context, c) {
         final scene = Stack(

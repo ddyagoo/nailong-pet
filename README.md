@@ -6,7 +6,25 @@
 两种形态：
 
 - **Android**：真·桌宠，奶龙浮在任何 App 之上（`dist/NailongPet-arm64.apk`）
+- **Windows**：透明置顶窗口 + 托盘，绿色版免安装（`dist/windows/NailongPet-win-x64.zip`）
 - **web**：模拟手机桌面，用来快速看效果（见下面的「跑起来」）
+
+## 装到电脑上（Windows）
+
+1. 下载 `dist/windows/NailongPet-win-x64.zip`（120MB），解压到任意目录
+2. 双击 `NailongPet.exe`，奶龙出现在屏幕右下角
+
+- **左键拖动**：挪位置
+- **单击**：今日播报
+- **长按**：笑（第三次笑到躺下）
+- **右键**：菜单（打开设置 / 显示隐藏 / 退出）
+- **托盘图标**：同样能打开设置、退出
+
+设置窗口里改的音量 / 大小 / 静置区间，关掉窗口就会同步到奶龙。卸载 = 删文件夹。
+
+> Windows 版是「Flutter web 构建 + Electron 外壳」：界面和逻辑跟手机是同一套 Dart 代码，
+> 透明贴桌面这层由 Electron 做（和 Android 用 Kotlin 悬浮窗是同一个思路）。
+> 待办在电脑上读不到系统日历，用的是 App 内的本地清单（在设置窗口里点「待办」维护）。
 
 ## 装到手机上（Android）
 
@@ -71,6 +89,7 @@ python -m http.server 8788 --bind 0.0.0.0
 ```
 app/                 Flutter 工程（web + android）
   lib/               界面与状态机，见 lib/ 下的注释
+  lib/services/desktop_bridge*.dart  Windows 桌面模式的桥接（拖动/气泡留白/右键菜单）
   assets/pet/        idle.webp / laugh.webp / egg.webp（透明动画）
   assets/audio/      laugh.mp3 / laugh_full.mp3 / tap.wav
   assets/fonts/      站酷快乐体（OFL）
@@ -78,16 +97,23 @@ app/                 Flutter 工程（web + android）
   android/.../kotlin/com/tomori/nailong_pet/
     OverlayService.kt   悬浮窗服务（前台服务 + 两个 WindowManager 窗口）
     PetOverlayView.kt   奶龙本体：AnimatedImageDrawable 播动画、Q 弹、拖动
-    PetBubbleView.kt    今日播报卡片（native 绘制）
+    PetBubbleView.kt    播报卡片（native 绘制）
     BroadcastData.kt    读 calendar.json + 系统日历
+    HolidaySync.kt      节假日在线同步（holiday-cn）
+    UpdateChecker.kt    GitHub Releases 版本检查
     Prefs.kt            读 Flutter 写的 SharedPreferences（double 是带前缀的字符串）
   android/app/src/main/assets/calendar.json   2024–2031 的农历/节日/调休表
+desktop/             Windows 外壳（Electron）
+  main.js            透明置顶窗口、托盘、拖动、气泡留白、本地静态服务
+  preload.js         给页面注入 desktopDragStart / desktopReserveBubble 等
+  run.ps1            从源码跑（会检查并补 Electron 运行时）
+  pack.ps1           打绿色版 zip
 tools/               素材与构建
   build_assets.py    ffmpeg 裁帧 → rembg 抠图 → 拼段 → WebP / 音频
   make_icons.py      从站立帧生成 App 图标
   build_apk.ps1      打正式版 APK（会先镜像到 C:\nailong_build 绕开中文路径）
 docs/design-spec.md  所有已确认的设计决策（改需求先改这里）
-dist/                打好的 APK
+dist/                打好的 APK 和 Windows 绿色版
 _work/               素材中间产物（可删，删了要重跑 tools/build_assets.py）
 ```
 
@@ -124,6 +150,21 @@ keyAlias=nailong
 ```
 
 **这个 keystore 要留着**，以后升级同一个 App 必须用同一把钥匙，否则只能卸载重装。
+
+## 打 Windows 包
+
+```powershell
+cd app; flutter build web --release; cd ..     # 先出 web 构建（Electron 加载的就是它）
+cd desktop; .\run.ps1                          # 从源码跑，第一次会自动装 Electron
+.\pack.ps1                                     # 打绿色版：dist/windows/NailongPet-win-x64.zip
+```
+
+- `desktop/run.ps1` 会检查 `node_modules/electron/dist/electron.exe`，没有就 `npm install`，
+  装不上就自动从 npmmirror 拉 zip 解压（国内直连 GitHub 经常失败）
+- 这台机器上跑 Electron 要先 `Remove-Item Env:ELECTRON_RUN_AS_NODE`：如果环境里带了这个变量，
+  Electron 会退化成纯 Node，`require('electron')` 拿到的是 npm 包路径而不是 API
+- 绿色版不用装运行时，解压双击 `NailongPet.exe` 即可；exe 图标还是 Electron 默认的
+  （换图标需要 rcedit，没做）
 
 ## Android 的实现说明
 

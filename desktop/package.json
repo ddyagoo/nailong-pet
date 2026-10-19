@@ -1,0 +1,15 @@
+{
+  "name": "nailong-pet-desktop",
+  "productName": "奶龙桌宠",
+  "version": "0.1.0",
+  "private": true,
+  "description": "奶龙桌宠 Windows 外壳（透明置顶窗口 + 托盘）",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "demo": "electron . --demo"
+  },
+  "devDependencies": {
+    "electron": "^33.2.0"
+  }
+}

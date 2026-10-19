@@ -7,6 +7,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../pet/pet_brain.dart';
 import '../pet/sprite_player.dart';
 import '../services/audio_service.dart';
+import '../services/desktop_bridge.dart';
 import '../services/holiday_service.dart';
 import '../services/settings_service.dart';
 import '../services/todo_store.dart';
@@ -22,12 +23,16 @@ class PetLayer extends StatefulWidget {
     required this.settings,
     required this.audio,
     required this.todos,
+    this.desktop = false,
   });
 
   final PetBrain brain;
   final SettingsService settings;
   final AudioService audio;
   final TodoStore todos;
+
+  /// Windows 桌面模式：奶龙固定在窗口底部，拖动移动的是整个窗口。
+  final bool desktop;
 
   @override
   State<PetLayer> createState() => PetLayerState();
@@ -55,6 +60,7 @@ class PetLayerState extends State<PetLayer> with TickerProviderStateMixin {
 
   bool _bubble = false;
   String _laughAsset = 'assets/pet/laugh.webp';
+  bool _desktopReserved = false;
 
   DayInfo? _day;
   List<TodoItem> _todos = const [];
@@ -140,12 +146,26 @@ class PetLayerState extends State<PetLayer> with TickerProviderStateMixin {
     await p.setDouble('${_posKey}_y', o.dy);
   }
 
+  /// 桌面模式下气泡弹出会让 Electron 把窗口往上撑高，关掉时再收回去。
+  void _setBubble(bool visible) {
+    if (_bubble == visible) return;
+    setState(() => _bubble = visible);
+    if (widget.desktop && _desktopReserved != visible) {
+      _desktopReserved = visible;
+      DesktopBridge.reserveBubble(visible);
+    }
+  }
+
   void _onLaughStart() {
     final egg = widget.brain.isEgg;
     setState(() {
       _bubble = false;
       if (egg) _laughAsset = 'assets/pet/egg.webp';
     });
+    if (widget.desktop && _desktopReserved) {
+      _desktopReserved = false;
+      DesktopBridge.reserveBubble(false);
+    }
     widget.audio.laugh(full: egg);
     if (widget.settings.hapticOn) HapticFeedback.mediumImpact();
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -181,7 +201,7 @@ class PetLayerState extends State<PetLayer> with TickerProviderStateMixin {
     widget.audio.unlock();
     if (widget.settings.hapticOn) HapticFeedback.selectionClick();
     if (_bubble) {
-      setState(() => _bubble = false);
+      _setBubble(false);
     } else {
       final now = DateTime.now();
       final ids = widget.todos.today;
@@ -189,17 +209,17 @@ class PetLayerState extends State<PetLayer> with TickerProviderStateMixin {
         _day = _holiday.day(now);
         _todos = ids.take(5).toList();
         _more = math.max(0, ids.length - 5);
-        _bubble = true;
       });
+      _setBubble(true);
       Future.delayed(const Duration(seconds: 12), () {
-        if (mounted && _bubble) setState(() => _bubble = false);
+        if (mounted && _bubble) _setBubble(false);
       });
     }
   }
 
   void _longPress() {
     // 长按 = 让它笑。前两次只播 6 秒那段，第三次起笑到躺下。
-    setState(() => _bubble = false);
+    _setBubble(false);
     widget.brain.triggerLaugh();
     if (widget.settings.hapticOn) HapticFeedback.mediumImpact();
   }
@@ -224,26 +244,32 @@ class PetLayerState extends State<PetLayer> with TickerProviderStateMixin {
       _petW = (base * widget.settings.petScale).clamp(90.0, 460.0);
       final petH = _petH;
 
-      // 改大小时保持「脚」的位置不动，不然会往屏幕外长
-      final size = Size(_petW, petH);
-      if (_lastPetSize != null && _lastPetSize != size) {
-        final d = _lastPetSize!;
-        _pos = (_pos ?? Offset.zero) +
-            Offset((d.width - size.width) / 2, d.height - size.height);
-      }
-      _lastPetSize = size;
+      if (widget.desktop) {
+        // 桌面模式：奶龙钉在窗口底部居中，拖动移动的是整个窗口
+        _pos = Offset((c.maxWidth - _petW) / 2, c.maxHeight - petH);
+        _lastPetSize = Size(_petW, petH);
+      } else {
+        // 改大小时保持「脚」的位置不动，不然会往屏幕外长
+        final size = Size(_petW, petH);
+        if (_lastPetSize != null && _lastPetSize != size) {
+          final d = _lastPetSize!;
+          _pos = (_pos ?? Offset.zero) +
+              Offset((d.width - size.width) / 2, d.height - size.height);
+        }
+        _lastPetSize = size;
 
-      _pos ??= Offset(c.maxWidth - _petW - 18, c.maxHeight - petH - 6);
-      _pos = Offset(
-        _pos!.dx
-            .clamp(6.0, math.max(6.0, c.maxWidth - _petW - 6))
-            .toDouble(),
-        _pos!.dy
-            .clamp(8.0, math.max(8.0, c.maxHeight - petH - 4))
-            .toDouble(),
-      );
+        _pos ??= Offset(c.maxWidth - _petW - 18, c.maxHeight - petH - 6);
+        _pos = Offset(
+          _pos!.dx
+              .clamp(6.0, math.max(6.0, c.maxWidth - _petW - 6))
+              .toDouble(),
+          _pos!.dy
+              .clamp(8.0, math.max(8.0, c.maxHeight - petH - 4))
+              .toDouble(),
+        );
+      }
       final pos = _pos!;
-      final bubbleAbove = pos.dy > 360;
+      final bubbleAbove = widget.desktop || pos.dy > 360;
 
       return Stack(
         children: [
@@ -271,12 +297,21 @@ class PetLayerState extends State<PetLayer> with TickerProviderStateMixin {
               behavior: HitTestBehavior.opaque,
               onTap: _poke,
               onLongPress: _longPress,
-              onPanStart: (_) => widget.brain.poke(),
+              onSecondaryTap: widget.desktop ? DesktopBridge.menu : null,
+              onPanStart: (_) {
+                widget.brain.poke();
+                if (widget.desktop) DesktopBridge.dragStart();
+              },
               onPanUpdate: (d) {
+                if (widget.desktop) return; // 窗口由 Electron 跟着光标移动
                 _pos = _pos! + d.delta;
                 _clampAndStore();
               },
               onPanEnd: (_) {
+                if (widget.desktop) {
+                  DesktopBridge.dragEnd();
+                  return;
+                }
                 // 贴近边缘时轻轻吸附
                 final left = _pos!.dx;
                 if (left < 30) _pos = Offset(12, _pos!.dy);
@@ -285,6 +320,9 @@ class PetLayerState extends State<PetLayer> with TickerProviderStateMixin {
                 }
                 _clampAndStore();
                 _savePosition(_pos!);
+              },
+              onPanCancel: () {
+                if (widget.desktop) DesktopBridge.dragEnd();
               },
               child: AnimatedBuilder(
                 animation: _pulse,

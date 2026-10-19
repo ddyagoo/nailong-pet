@@ -19,6 +19,10 @@ dist/
 *.apk
 *.aab
 
+# ---- Windows 外壳 ----
+desktop/node_modules/
+desktop/demo-shot.png
+
 # ---- 素材中间产物（几百 MB，可用 tools/build_assets.py 重建）----
 _work/
 _probe/

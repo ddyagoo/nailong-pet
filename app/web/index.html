@@ -68,6 +68,13 @@
 
   <script src="flutter_bootstrap.js" async></script>
   <script>
+    // Electron 桌面模式：页面和 CanvasKit 都要透明，把加载页也藏起来
+    if (location.search.indexOf('desktop=1') !== -1) {
+      document.documentElement.style.background = 'transparent';
+      document.body.style.background = 'transparent';
+      var bootEl = document.getElementById('boot');
+      if (bootEl) bootEl.remove();
+    }
     function hideBoot() {
       var boot = document.getElementById('boot');
       if (!boot || boot.classList.contains('gone')) return;

@@ -1,4 +1,4 @@
-# 打一个正式版 APK
+﻿# 打一个正式版 APK
 #
 # 中文路径会让 Dart 的 AOT 快照器挂掉（"Unable to read file ... app.dill"），
 # 所以先把 app/ 镜像到纯英文路径再编译，产物拷回 dist/。
