@@ -44,6 +44,7 @@ class PetLayerState extends State<PetLayer> with TickerProviderStateMixin {
 
   final _holiday = const HolidayService();
   final _laughKey = GlobalKey<SpritePlayerState>();
+  final _bubbleKey = GlobalKey();
 
   late final AnimationController _bounce;
   late final Animation<double> _scale;
@@ -271,6 +272,8 @@ class PetLayerState extends State<PetLayer> with TickerProviderStateMixin {
       final pos = _pos!;
       final bubbleAbove = widget.desktop || pos.dy > 360;
 
+      _reportHitArea(c.maxWidth, pos, petH, bubbleAbove);
+
       return Stack(
         children: [
           if (_bubble && _day != null)
@@ -279,6 +282,7 @@ class PetLayerState extends State<PetLayer> with TickerProviderStateMixin {
               top: bubbleAbove ? null : pos.dy + petH + 12,
               bottom: bubbleAbove ? c.maxHeight - pos.dy + 6 : null,
               child: BubbleReveal(
+                key: _bubbleKey,
                 child: PetBubble(
                   info: _day!,
                   todos: _todos,
@@ -380,6 +384,26 @@ class PetLayerState extends State<PetLayer> with TickerProviderStateMixin {
           ),
         ],
       );
+    });
+  }
+
+  /// 把「奶龙 + 气泡」的范围报给 Windows 外壳，用来做点击穿透。
+  void _reportHitArea(double sceneW, Offset pos, double petH, bool bubbleAbove) {
+    if (!widget.desktop) return;
+    final petRect = Rect.fromLTWH(pos.dx, pos.dy, _petW, petH);
+    var hit = petRect.inflate(_petW * 0.12);
+
+    if (_bubble && _day != null) {
+      final box = _bubbleKey.currentContext?.findRenderObject() as RenderBox?;
+      final w = box?.size.width ?? PetBubble.maxWidth.toDouble();
+      final h = box?.size.height ?? 260;
+      final left = _bubbleLeft(sceneW, pos);
+      final top = bubbleAbove ? pos.dy - h - 6 : pos.dy + petH + 12;
+      hit = hit.expandToInclude(Rect.fromLTWH(left, top, w, h));
+    }
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) DesktopBridge.reportHitArea(hit);
     });
   }
 

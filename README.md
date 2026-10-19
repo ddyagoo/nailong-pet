@@ -15,26 +15,27 @@
 ## 装到电脑上（Windows）
 
 1. 从 [Releases](https://github.com/ddyagoo/nailong-pet/releases/latest) 下载
-   `NailongPet-Setup-0.1.0.exe`（82MB），双击安装
+   `NailongPet-Setup-0.2.0.exe`（18MB），双击安装
 2. 装完自动创建桌面和开始菜单快捷方式「奶龙桌宠」，打开后奶龙出现在屏幕右下角
 
 - **左键拖动**：挪位置
 - **单击**：今日播报
 - **长按**：笑（第三次笑到躺下）
-- **右键**：菜单（打开设置 / 检查更新 / 显示隐藏 / 退出）
-- **托盘图标**：同样能打开设置、检查更新、退出
+- **右键**：菜单（显示/隐藏、检查更新、退出）
+- **托盘图标**：同一份菜单
 
-设置窗口里改的音量 / 大小 / 静置区间，关掉窗口就会同步到奶龙。
+设置就在同一个窗口里弹出来（音量 / 大小 / 静置区间 / 眨眼间隔 / 振动 / 回位）。
 
 **检查更新**：右键或托盘菜单里点「检查更新…」，会去 GitHub Releases 比版本号，
 有新版本弹窗显示更新说明，点「去 GitHub 下载」用浏览器打开下载页。
-启动 8 秒后也会静默查一次，同一个版本只提醒一次。
+启动 8 秒后也会静默查一次，有新版本才提醒。
 
 卸载：Windows 设置 → 应用 → 奶龙桌宠 → 卸载（会保留你的设置）。
 
-> Windows 版是「Flutter web 构建 + Electron 外壳」：界面和逻辑跟手机是同一套 Dart 代码，
-> 透明贴桌面这层由 Electron 做（和 Android 用 Kotlin 悬浮窗是同一个思路）。
-> 待办在电脑上读不到系统日历，用的是 App 内的本地清单（在设置窗口里点「待办」维护）；
+> Windows 版是**原生 Flutter**（`flutter build windows`），没有 Electron、没有 Chromium：
+> 窗口尺寸固定，气泡画在窗口里，所以不会出现「气泡一弹奶龙跟着跳」。
+> 透明窗口靠 `flutter_acrylic`，点击穿透靠轮询光标 + `WS_EX_TRANSPARENT`。
+> 待办在电脑上读不到系统日历，用的是 App 内的本地清单；
 > **法定节假日/调休和手机一样是在线同步的**，7 天一次，离线用缓存。
 
 ## 装到手机上（Android）
@@ -101,13 +102,16 @@ python -m http.server 8788 --bind 0.0.0.0
 ## 目录
 
 ```
-app/                 Flutter 工程（web + android）
+app/                 Flutter 工程（web + android + windows）
   lib/               界面与状态机，见 lib/ 下的注释
-  lib/services/desktop_bridge*.dart  Windows 桌面模式的桥接（拖动/气泡留白/右键菜单）
+  lib/services/desktop_shell.dart    Windows 原生外壳：透明窗口、托盘、点击穿透、更新
+  lib/services/native_win32.dart     直接 FFI 调的 4 个 user32 函数
   assets/pet/        idle.webp / laugh.webp / egg.webp（透明动画）
   assets/audio/      laugh.mp3 / laugh_full.mp3 / tap.wav
   assets/fonts/      站酷快乐体（OFL）
+  assets/icons/      app_icon.ico（托盘图标）
   web/               manifest、PWA 图标、启动页、flutter_bootstrap.js
+  windows/           Flutter Windows runner（无边框 / 置顶 / 不进任务栏）
   android/.../kotlin/com/tomori/nailong_pet/
     OverlayService.kt   悬浮窗服务（前台服务 + 两个 WindowManager 窗口）
     PetOverlayView.kt   奶龙本体：AnimatedImageDrawable 播动画、Q 弹、拖动
@@ -117,17 +121,16 @@ app/                 Flutter 工程（web + android）
     UpdateChecker.kt    GitHub Releases 版本检查
     Prefs.kt            读 Flutter 写的 SharedPreferences（double 是带前缀的字符串）
   android/app/src/main/assets/calendar.json   2024–2031 的农历/节日/调休表
-desktop/             Windows 外壳（Electron）
-  main.js            透明置顶窗口、托盘、拖动、气泡留白、本地静态服务
-  preload.js         给页面注入 desktopDragStart / desktopReserveBubble 等
-  run.ps1            从源码跑（会检查并补 Electron 运行时）
-  pack.ps1           打绿色版 zip
+desktop/             老的 Electron 外壳（已停用，仅留档）
 tools/               素材与构建
   build_assets.py    ffmpeg 裁帧 → rembg 抠图 → 拼段 → WebP / 音频
   make_icons.py      从站立帧生成 App 图标
   build_apk.ps1      打正式版 APK（会先镜像到 C:\nailong_build 绕开中文路径）
+  build_windows.ps1  打 Windows 原生版（同样镜像到 C:\nailong_build）
+  pack_windows.ps1   NSIS 安装包（用 electron-builder 缓存里的 makensis）
+  installer.nsi      安装包脚本（装到 %LOCALAPPDATA%，建快捷方式 + 卸载项）
 docs/design-spec.md  所有已确认的设计决策（改需求先改这里）
-dist/                打好的 APK 和 Windows 绿色版
+dist/                打好的 APK、Windows 安装包
 _work/               素材中间产物（可删，删了要重跑 tools/build_assets.py）
 ```
 
@@ -172,26 +175,22 @@ keyAlias=nailong
 ## 打 Windows 安装包
 
 ```powershell
-cd app; flutter build web --release; cd ..     # 先出 web 构建（Electron 加载的就是它）
-cd desktop; .\run.ps1                          # 从源码跑，第一次会自动装 Electron
-.\pack.ps1                                     # 打安装包：dist/windows/NailongPet-Setup-0.1.0.exe
+powershell -File tools\build_windows.ps1   # flutter build windows --release，产物到 dist\windows\app
+powershell -File tools\pack_windows.ps1    # NSIS 安装包：dist\windows\NailongPet-Setup-0.2.0.exe
 ```
 
-- `pack.ps1` 会把 `app/build/web` 同步到 `desktop/web`，再交给 electron-builder 出 NSIS 安装包
-- 同步完会**精简 canvaskit**：只留 JS 版渲染器要用的 `canvaskit.js/.wasm`，删掉
-  `chromium/`（另一份 wasm）、`skwasm*/wimp*`（`--wasm` 构建才用）、`*.symbols`（调试符号），
-  合起来约 23MB。`app/web/flutter_bootstrap.js` 里固定了 `canvasKitVariant: "full"`，
-  保证不会去请求删掉的变体
-- 安装包体积约 **82MB**，其中 60MB 以上是 Electron 自带的 Chromium 内核（`NailongPet.exe`
-  本身就有 180MB，压缩后仍是大头），真正的内容（宠物动画 9MB + 字体 + 逻辑）不到 15MB。
-  想再小只能换 WebView2 外壳
-- 安装包是 `oneClick=false`（可以选安装目录）、装完建桌面 + 开始菜单快捷方式，卸载走系统「应用」
-- `desktop/run.ps1` 会检查 `node_modules/electron/dist/electron.exe`，没有就 `npm install`，
-  装不上就自动从 npmmirror 拉 zip 解压（国内直连 GitHub 经常失败）
-- 这台机器上跑 Electron 要先 `Remove-Item Env:ELECTRON_RUN_AS_NODE`：如果环境里带了这个变量，
-  Electron 会退化成纯 Node，`require('electron')` 拿到的是 npm 包路径而不是 API
-- electron-builder 首次打包会从 GitHub 下 nsis / 7zip / icons，网络抖的话重跑一次就行
+- 两步都要**在纯英文路径的镜像里编译**：中文路径会让 Dart 的 AOT 快照器报
+  `Unable to read file ... app.dill`，所以脚本会先 robocopy 到 `C:\nailong_build\app`（`/MIR`，
+  顺手清掉源码里已删除的旧素材），编译完再拷回 `dist\windows\app`
+- `makensis` 也不认中文路径：`pack_windows.ps1` 会把 `.nsi`、图标先拷到 `C:\nailong_build` 再编译，
+  产物出到那边后拷回 `dist\windows`。makensis 直接用 electron-builder 缓存里的那份
+  （`%LOCALAPPDATA%\electron-builder\Cache\nsis-3.0.4.1\...`），**不用额外装 Inno Setup**
+- 安装包体积约 **18MB**（`flutter_windows.dll` 19.8MB + `app.so` 5.3MB + 素材 9MB，LZMA 压到 45%）
+- 装到 `%LOCALAPPDATA%\Programs\NailongPet`，建桌面 + 开始菜单快捷方式，卸载项写在 HKCU
 - 没有代码签名证书，所以 Windows 第一次运行会弹 SmartScreen「未知发布者」，点「仍要运行」
+- ⚠️ `windows/runner/*.cpp` **只能写 ASCII 注释**：MSVC 按代码页 936 解析非 ASCII 源码，
+  会报 C4819 并把后面的声明吞掉
+- 老的 Electron 外壳还在 `desktop/` 里，已经不再打包；确认原生版稳定后可以整个删掉
 
 ## Android 的实现说明
 

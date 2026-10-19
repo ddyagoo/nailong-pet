@@ -68,12 +68,14 @@ class _HomeSceneState extends State<HomeScene> {
   }
 
   void _openSettings() {
+    // 设置面板比奶龙大，得让整个窗口都能点，不然点击穿透会把面板吃掉
+    DesktopBridge.setInteractive(true);
     showSettingsSheet(
       context,
       settings: widget.settings,
       onResetPosition: () => _petKey.currentState?.resetPosition(),
       onOpenTodos: () => showTodoSheet(context, widget.todos),
-    );
+    ).whenComplete(() => DesktopBridge.setInteractive(false));
   }
 
   @override

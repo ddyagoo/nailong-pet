@@ -126,9 +126,31 @@ lib/
 
 产物：`dist/NailongPet.apk`（61MB，全架构单包；不再单独出 arm64）。
 
-## 6. 已知限制
+## 6. Windows 实现（原生 Flutter）
+
+第一版是「Flutter web + Electron 外壳」，82MB 且气泡一出现就把窗口拉高 380px，
+奶龙跟着跳。2026-10 换成一等公民的 `flutter build windows`：
+
+| 点 | 做法 |
+|---|---|
+| 框架 | `app/windows/` runner：`WS_POPUP` 无边框、`WS_EX_TOOLWINDOW` 不进任务栏、置顶 |
+| 透明 | `flutter_acrylic` 的 `WindowEffect.transparent`（`SetWindowCompositionAttribute`）。**原生 Flutter 的交换链是不透明的**，只靠 DWM 玻璃会得到纯黑底，必须走这个 API |
+| 气泡 | 单窗口固定 420×820，气泡画在窗口内 → **不再改窗口尺寸，乱跳问题从架构上消失** |
+| 拖动 | `window_manager.startDragging()`；位置存 `%LOCALAPPDATA%\NailongPet\window.txt` |
+| 点击穿透 | 80ms 轮询 `GetCursorPos`，光标不在「奶龙 ∪ 气泡」矩形里就给窗口加 `WS_EX_TRANSPARENT`（只用到 4 个 user32 函数，直接 FFI，不依赖 win32 包） |
+| 托盘 | `tray_manager`：显示/隐藏、检查更新、退出；右键奶龙弹同一份菜单 |
+| 更新 | `lib/services/update_service.dart`：`http` 拉 Releases + `package_info_plus` 比版本，`url_launcher` 打开下载页 |
+| 打包 | NSIS（`tools/installer.nsi`，用 electron-builder 缓存里的 `makensis`，不装 Inno Setup），装到 `%LOCALAPPDATA%\Programs\NailongPet` |
+| 构建 | `tools/build_windows.ps1` 先镜像到 `C:\nailong_build`（中文路径同样会让 AOT 挂），makensis 也只认英文路径 |
+
+产物：`dist/windows/NailongPet-Setup-0.2.0.exe`（18MB）。
+
+坑：`windows/runner/*.cpp` **只能写 ASCII 注释**——MSVC 按代码页 936 解析，非 ASCII 会报
+C4819 并把后面的声明吞掉，症状是「style 未声明的标识符」。
+
+## 7. 已知限制
 
 1. Android 8.0/8.1 只有静态帧（`AnimatedImageDrawable` 需要 API 28）
 2. 奶龙被拖到屏幕顶部时，气泡会盖住它
-3. 全屏视频 / 游戏时不会自动静音（仍会笑）
+3. 全屏视频 / 游戏时不会自动静音（仍会笑）；Windows 上也还没有「全屏游戏时自动隐藏」
 4. iOS 做不了跨 App 悬浮，只能做 App 内桌宠

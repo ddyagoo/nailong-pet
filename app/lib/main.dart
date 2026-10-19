@@ -5,6 +5,7 @@ import 'pet/pet_brain.dart';
 import 'screens/android_home.dart';
 import 'screens/home_scene.dart';
 import 'services/audio_service.dart';
+import 'services/desktop_shell.dart';
 import 'services/holiday_sync.dart';
 import 'services/settings_service.dart';
 import 'services/todo_store.dart';
@@ -23,7 +24,19 @@ Future<void> main() async {
   // 读本地缓存的节假日覆盖表；过期的会在后台自己刷（不阻塞启动）
   await HolidaySync.init();
 
+  // Windows 原生外壳：透明置顶窗口 + 托盘
+  if (DesktopShell.isWindows) {
+    await DesktopShell.instance.init();
+  }
+
   runApp(NailongApp(settings: settings, todos: todos, audio: audio));
+
+  // 启动 8 秒后静默查一次更新（只提醒，不自动装）
+  if (DesktopShell.isWindows) {
+    Future.delayed(const Duration(seconds: 8), () {
+      DesktopShell.instance.checkUpdateSilently();
+    });
+  }
 }
 
 class NailongApp extends StatefulWidget {
@@ -75,6 +88,8 @@ class _NailongAppState extends State<NailongApp> {
     return MaterialApp(
       title: '奶龙桌宠',
       debugShowCheckedModeBanner: false,
+      navigatorKey:
+          DesktopShell.isWindows ? DesktopShell.instance.navigatorKey : null,
       theme: buildTheme(),
       home: isAndroid
           ? AndroidHome(settings: widget.settings, todos: widget.todos)
