@@ -1,5 +1,7 @@
 import 'package:lunar/lunar.dart';
 
+import 'holiday_sync.dart';
+
 /// 一天里奶龙要播报的东西（纯数据，不含界面）。
 class DayInfo {
   const DayInfo({
@@ -56,6 +58,8 @@ class HolidayService {
 
     final jieQi = lunar.getJieQi();
     final holiday = HolidayUtil.getHolidayByYmd(now.year, now.month, now.day);
+    // 在线同步下来的法定节假日优先，能覆盖内置表没有的年份（比如 2027）
+    final online = HolidaySync.lookup(now);
 
     final lunarLine =
         '农历${lunar.getMonthInChinese()}月${lunar.getDayInChinese()}';
@@ -66,9 +70,11 @@ class HolidayService {
       lunarLine: lunarLine,
       festivals: festivals,
       jieQi: jieQi.isEmpty ? null : jieQi,
-      legalHoliday: holiday?.getName(),
-      isRestDay: holiday != null && !holiday.isWork(),
-      adjustment: (holiday != null && holiday.isWork()) ? '今天调休上班' : null,
+      legalHoliday: online?.name ?? holiday?.getName(),
+      isRestDay: online?.off ?? (holiday != null && !holiday.isWork()),
+      adjustment: online != null
+          ? (online.off ? null : '今天调休上班')
+          : ((holiday != null && holiday.isWork()) ? '今天调休上班' : null),
       nextFestival: _nextFestival(now),
     );
   }

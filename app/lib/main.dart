@@ -5,6 +5,7 @@ import 'pet/pet_brain.dart';
 import 'screens/android_home.dart';
 import 'screens/home_scene.dart';
 import 'services/audio_service.dart';
+import 'services/holiday_sync.dart';
 import 'services/settings_service.dart';
 import 'services/todo_store.dart';
 import 'theme.dart';
@@ -19,6 +20,8 @@ Future<void> main() async {
   final audio = AudioService();
   await audio.init();
   await audio.setVolume(settings.volume);
+  // 读本地缓存的节假日覆盖表；过期的会在后台自己刷（不阻塞启动）
+  await HolidaySync.init();
 
   runApp(NailongApp(settings: settings, todos: todos, audio: audio));
 }
