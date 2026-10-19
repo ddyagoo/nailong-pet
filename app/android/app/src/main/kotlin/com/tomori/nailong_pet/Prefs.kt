@@ -40,6 +40,13 @@ object Prefs {
     fun idleMax(ctx: Context): Int =
         readDouble(sp(ctx), "flutter.idle_max", 90.0).toInt().coerceIn(5, 600)
 
+    /** 待机动画两段之间的停顿（单位：秒），默认 0.5–2，上限 10 */
+    fun blinkMinSec(ctx: Context): Double =
+        readDouble(sp(ctx), "flutter.blink_min", 0.5).coerceIn(0.5, 10.0)
+
+    fun blinkMaxSec(ctx: Context): Double =
+        readDouble(sp(ctx), "flutter.blink_max", 2.0).coerceIn(0.5, 10.0)
+
     // 悬浮窗自己的位置（与 App 内桌宠的位置分开存）
     fun overlayPos(ctx: Context): Pair<Int, Int>? {
         val sp = sp(ctx)

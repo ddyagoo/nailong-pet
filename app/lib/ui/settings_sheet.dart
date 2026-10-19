@@ -206,6 +206,38 @@ class _SettingsSheetState extends State<_SettingsSheet> {
                       '在这个区间的随机一秒笑，笑完重新计时进入下一轮',
                       style: T.caption.copyWith(fontSize: 11),
                     ),
+                    const SizedBox(height: 14),
+                    Row(
+                      children: [
+                        const Icon(Icons.remove_red_eye_outlined,
+                            size: 18, color: Palette.orange),
+                        const SizedBox(width: 8),
+                        Text('眨眼间隔', style: T.label),
+                        const Spacer(),
+                        Text(
+                          '${s.blinkMin.toStringAsFixed(1)}–'
+                          '${s.blinkMax.toStringAsFixed(1)} 秒',
+                          style: T.caption,
+                        ),
+                      ],
+                    ),
+                    RangeSlider(
+                      values: RangeValues(s.blinkMin, s.blinkMax),
+                      min: 0.5,
+                      max: 10,
+                      divisions: 19,
+                      activeColor: Palette.yellow,
+                      inactiveColor: Palette.line,
+                      labels: RangeLabels(
+                        '${s.blinkMin.toStringAsFixed(1)}s',
+                        '${s.blinkMax.toStringAsFixed(1)}s',
+                      ),
+                      onChanged: (v) => s.setBlinkRange(v.start, v.end),
+                    ),
+                    Text(
+                      '待机动画播完停这么久再播，随机取；改动下一段生效',
+                      style: T.caption.copyWith(fontSize: 11),
+                    ),
                   ],
                 ),
                 const SizedBox(height: 14),

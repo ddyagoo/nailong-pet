@@ -52,21 +52,20 @@ class PetOverlayView(context: Context) : View(context) {
     private val laughDuration = 6000L
     private val eggDuration = 15850L
 
+    /** 待机整段的时长（44 帧 @15fps），用来判断「播完了」并开始随机停顿。 */
+    private val idleDuration = 2933L
+
     private var idleDrawable: Drawable? = null
     private var laughDrawable: Drawable? = null
     private var eggDrawable: Drawable? = null
 
-    /** 待机时随机播放的眼睛小动作（眨眼 / 连眨 / 转眼珠）。 */
-    private class EyeClip(val drawable: Drawable, val durationMs: Long, val weight: Double)
-
-    private var eyeBlink: Drawable? = null
-    private var eyeBlink2: Drawable? = null
-    private var eyeGlance: Drawable? = null
-    private val eyeClips = ArrayList<EyeClip>()
-
     private val rng = java.util.Random()
-    private var eyeNext: Runnable? = null
-    private var eyeEnd: Runnable? = null
+
+    /** 一段待机播完、进入停顿。 */
+    private var idleEnd: Runnable? = null
+
+    /** 停顿结束、重播下一段。 */
+    private var idleNext: Runnable? = null
 
     private var current: Drawable? = null
     private var state = State.IDLE
@@ -122,12 +121,7 @@ class PetOverlayView(context: Context) : View(context) {
         idleDrawable = drawableFrom(base + "idle.webp")
         laughDrawable = drawableFrom(base + "laugh.webp")
         eggDrawable = drawableFrom(base + "egg.webp")
-        eyeBlink = drawableFrom(base + "blink.webp")
-        eyeBlink2 = drawableFrom(base + "blink2.webp")
-        eyeGlance = drawableFrom(base + "glance.webp")
-        listOfNotNull(
-            idleDrawable, laughDrawable, eggDrawable, eyeBlink, eyeBlink2, eyeGlance,
-        ).forEach {
+        listOfNotNull(idleDrawable, laughDrawable, eggDrawable).forEach {
             if (it is AnimatedImageDrawable) {
                 it.callback = object : Drawable.Callback {
                     override fun invalidateDrawable(who: Drawable) = invalidate()
@@ -141,17 +135,6 @@ class PetOverlayView(context: Context) : View(context) {
                 }
             }
         }
-
-        // 26/27 上这些 webp 只是静态帧，随机眨眼就没意义了
-        eyeClips.clear()
-        listOf(
-            Triple(eyeBlink, 650L, 0.70),
-            Triple(eyeGlance, 2600L, 0.22),
-            Triple(eyeBlink2, 1200L, 0.08),
-        ).forEach { (d, ms, w) ->
-            if (d is AnimatedImageDrawable) eyeClips.add(EyeClip(d, ms, w))
-        }
-        android.util.Log.d("Nailong", "eye clips ready=${eyeClips.size}")
     }
 
     private fun startDrawable(d: Drawable?) {
@@ -166,57 +149,46 @@ class PetOverlayView(context: Context) : View(context) {
     fun showIdle() {
         endRunnable?.let { handler.removeCallbacks(it) }
         endRunnable = null
-        eyeEnd?.let { handler.removeCallbacks(it) }
-        eyeEnd = null
         state = State.IDLE
-        startDrawable(idleDrawable)
-        scheduleEye()
+        playIdleOnce()
     }
 
-    // ---------------- 待机时的眼睛 ----------------
+    // ---------------- 待机：播一次 → 随机停顿 → 再播 ----------------
 
-    /** 下一次动眼睛：大多 2.6~7 秒，偶尔发呆到十几二十秒。 */
-    private fun eyeDelayMs(): Long {
-        return if (rng.nextDouble() < 0.16) 12000L + rng.nextInt(10001)
-        else 2600L + rng.nextInt(4401)
+    private fun cancelIdleTimers() {
+        idleEnd?.let { handler.removeCallbacks(it) }
+        idleEnd = null
+        idleNext?.let { handler.removeCallbacks(it) }
+        idleNext = null
     }
 
-    private fun scheduleEye() {
-        eyeNext?.let { handler.removeCallbacks(it) }
-        eyeNext = null
-        if (state != State.IDLE || eyeClips.isEmpty()) return
-        val r = Runnable { playEye() }
-        eyeNext = r
-        handler.postDelayed(r, eyeDelayMs())
-    }
-
-    private fun playEye() {
-        eyeNext = null
-        if (state != State.IDLE || eyeClips.isEmpty()) return
-        var pick = rng.nextDouble()
-        var clip = eyeClips.first()
-        for (c in eyeClips) {
-            if (pick < c.weight) {
-                clip = c
-                break
-            }
-            pick -= c.weight
+    /** 播一整段站立动画（2.93 秒），播完交给 [idlePlayed]。 */
+    private fun playIdleOnce() {
+        cancelIdleTimers()
+        if (idleDrawable is AnimatedImageDrawable) {
+            (idleDrawable as AnimatedImageDrawable).repeatCount = 0
         }
-        val d = clip.drawable as? AnimatedImageDrawable ?: return
-        d.repeatCount = 0
-        startDrawable(d)
-        // 片段的最后一帧就是站立定帧，所以这里晚一点收尾也看不出来
-        val end = Runnable { if (state == State.IDLE) showIdle() }
-        eyeEnd = end
-        handler.postDelayed(end, clip.durationMs)
+        startDrawable(idleDrawable)
+        val end = Runnable { if (state == State.IDLE) idlePlayed() }
+        idleEnd = end
+        handler.postDelayed(end, idleDuration + 40)
+    }
+
+    /** 一段播完，按设置里的随机停顿排下一段（0.5–10 秒，默认 0.5–2 秒）。 */
+    private fun idlePlayed() {
+        idleEnd = null
+        if (state != State.IDLE) return
+        val lo = (Prefs.blinkMinSec(context) * 1000).toLong()
+        val hi = (Prefs.blinkMaxSec(context) * 1000).toLong()
+        val gap = if (hi <= lo) lo else lo + rng.nextLong(hi - lo + 1)
+        val r = Runnable { if (state == State.IDLE) playIdleOnce() }
+        idleNext = r
+        handler.postDelayed(r, gap)
     }
 
     /** 笑一次；egg=true 播完整版（笑到躺下）。结束后自动回到 idle。 */
     fun playLaugh(egg: Boolean, onDone: (() -> Unit)? = null) {
-        eyeNext?.let { handler.removeCallbacks(it) }
-        eyeNext = null
-        eyeEnd?.let { handler.removeCallbacks(it) }
-        eyeEnd = null
+        cancelIdleTimers()
         state = State.LAUGH
         val d = if (egg) eggDrawable else laughDrawable
         android.util.Log.d("Nailong", "playLaugh egg=$egg drawable=${d != null}")
@@ -280,8 +252,7 @@ class PetOverlayView(context: Context) : View(context) {
 
     override fun onDetachedFromWindow() {
         endRunnable?.let { handler.removeCallbacks(it) }
-        eyeNext?.let { handler.removeCallbacks(it) }
-        eyeEnd?.let { handler.removeCallbacks(it) }
+        cancelIdleTimers()
         (current as? AnimatedImageDrawable)?.stop()
         super.onDetachedFromWindow()
     }

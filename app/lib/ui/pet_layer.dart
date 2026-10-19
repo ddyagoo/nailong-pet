@@ -360,7 +360,10 @@ class PetLayerState extends State<PetLayer> with TickerProviderStateMixin {
                     IndexedStack(
                       index: widget.brain.mood == PetMood.idle ? 0 : 1,
                       children: [
-                        IdlePet(enabled: widget.brain.mood == PetMood.idle),
+                        IdlePet(
+                          settings: widget.settings,
+                          enabled: widget.brain.mood == PetMood.idle,
+                        ),
                         SpritePlayer(
                           key: _laughKey,
                           asset: _laughAsset,

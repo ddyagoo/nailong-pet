@@ -10,6 +10,8 @@ class SettingsService extends ChangeNotifier {
   static const _kScale = 'pet_scale';
   static const _kIdleMin = 'idle_min';
   static const _kIdleMax = 'idle_max';
+  static const _kBlinkMin = 'blink_min';
+  static const _kBlinkMax = 'blink_max';
 
   double _volume = 0.7;
   bool _muted = false;
@@ -20,6 +22,10 @@ class SettingsService extends ChangeNotifier {
   /// 静置多久会笑：在这个区间里随机取一秒。
   double _idleMin = 30;
   double _idleMax = 90;
+
+  /// 待机动画播完之后停多久：在这个区间里随机取一个停顿（秒）。
+  double _blinkMin = 0.5;
+  double _blinkMax = 2.0;
 
   double get volume => _muted ? 0 : _volume;
   double get sliderValue => _volume;
@@ -33,6 +39,10 @@ class SettingsService extends ChangeNotifier {
   double get idleMin => _idleMin;
   double get idleMax => _idleMax;
 
+  /// 待机动画两段之间的停顿（秒）。
+  double get blinkMin => _blinkMin;
+  double get blinkMax => _blinkMax;
+
   Future<void> load() async {
     final p = await SharedPreferences.getInstance();
     _volume = p.getDouble(_kVolume) ?? 0.7;
@@ -42,7 +52,27 @@ class SettingsService extends ChangeNotifier {
     _petScale = p.getDouble(_kScale) ?? 1.0;
     _idleMin = p.getDouble(_kIdleMin) ?? 30;
     _idleMax = p.getDouble(_kIdleMax) ?? 90;
+    _blinkMin = (p.getDouble(_kBlinkMin) ?? 0.5).clamp(0.5, 10.0);
+    _blinkMax = (p.getDouble(_kBlinkMax) ?? 2.0).clamp(0.5, 10.0);
+    if (_blinkMax < _blinkMin) _blinkMax = _blinkMin;
     notifyListeners();
+  }
+
+  /// 待机停顿时长：允许 min == max（固定间隔），只保证 min <= max。
+  Future<void> setBlinkRange(double min, double max) async {
+    var lo = min.clamp(0.5, 10.0);
+    var hi = max.clamp(0.5, 10.0);
+    if (hi < lo) {
+      final t = lo;
+      lo = hi;
+      hi = t;
+    }
+    _blinkMin = lo;
+    _blinkMax = hi;
+    notifyListeners();
+    final p = await SharedPreferences.getInstance();
+    await p.setDouble(_kBlinkMin, lo);
+    await p.setDouble(_kBlinkMax, hi);
   }
 
   Future<void> setIdleRange(double min, double max) async {

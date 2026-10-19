@@ -211,44 +211,20 @@ def stage_webp() -> None:
 
 
 def stage_eyes() -> None:
-    """待机 + 眼睛小动作。
+    """待机：源视频 0–1.5s 正放 + 倒放。
 
-    待机就是一张定帧（源视频里身体本来就是静止的，只有眼皮在动）。
-    眨眼 / 连眨 / 转眼珠拆成独立小片段，由 App 用随机间隔穿插播放，
-    这样眼睛动的节奏才不是固定周期。
+    这一整段 2.93 秒里身体不动、眼皮和眼珠在动，第一版就是拿它循环的。
+    现在仍然用整段（观感才对），只是不再循环播放——由 App 用随机间隔
+    「播一次 → 停一会儿 → 再播」，节奏不再固定。
     """
-    files = sorted(CLIPS.glob("idle_*.png"))
-    if not files:
-        sys.exit("run seg first")
+    _encode("idle", _resample("idle", 15), 15)
 
-    def load(i: int) -> Image.Image:
-        return Image.open(files[i]).convert("RGBA")
-
-    NEUTRAL = 0   # 站立定帧：笑完回到待机也是这一帧
-    OPEN = 18     # 眨完重新睁眼，≈ NEUTRAL（误差 <1px）
-    GAZE = 42     # 眼珠看到最右边
-
-    # 定帧待机
-    _encode("idle", [load(NEUTRAL)], 15)
-
-    # 眨眼：0→闭→睁（源 19 帧 0.63s，24fps 重采样后略快，眨眼利落一点）
-    blink_src = list(range(NEUTRAL, OPEN + 1, 2))
-    if blink_src[-1] != OPEN:
-        blink_src.append(OPEN)
-    blink = [load(i) for i in blink_src]
-
-    # 回到定帧，保证和 idle 首帧严丝合缝
-    _encode("blink", blink + [load(NEUTRAL)], 24)
-
-    # 连眨两下：中间留 3 帧睁眼
-    hold = [load(OPEN)] * 3
-    again = [load(i) for i in blink_src[1:]]
-    _encode("blink2", blink + hold + again + [load(NEUTRAL)], 24)
-
-    # 转眼珠：往右瞟再瞟回来（源视频原本就是靠 ping-pong 回位的）
-    out = [NEUTRAL] + list(range(OPEN, GAZE + 1, 2))
-    back = list(range(GAZE - 2, OPEN - 1, -2))
-    _encode("glance", [load(i) for i in out + back + [NEUTRAL]], 15)
+    # 清掉上一版拆出来的小片段，别让它们继续被打进包里
+    for stale in ("blink", "blink2", "glance"):
+        p = ASSETS / f"{stale}.webp"
+        if p.exists():
+            p.unlink()
+            print(f"removed stale {p.name}")
 
 
 def _run(cmd: list[str]) -> None:

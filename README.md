@@ -5,7 +5,7 @@
 
 两种形态：
 
-- **Android**：真·桌宠，奶龙浮在任何 App 之上（`NailongPet-arm64.apk`）
+- **Android**：真·桌宠，奶龙浮在任何 App 之上（`NailongPet.apk`）
 - **Windows**：透明置顶窗口 + 托盘，安装程序（`NailongPet-Setup-0.1.0.exe`，82MB）
 - **web**：模拟手机桌面，用来快速看效果（见下面的「跑起来」）
 
@@ -40,10 +40,11 @@
 ## 装到手机上（Android）
 
 1. 从 [Releases](https://github.com/ddyagoo/nailong-pet/releases/latest) 下载
-   `NailongPet-arm64.apk`，传到手机（数据线 / 微信文件传输都行）后点开安装；
-   系统提示「未知来源」时允许一次。
-   - arm64 版 30MB，绝大多数手机（含红米）都用这个
-   - 万一提示「应用未安装」，换 `NailongPet-universal.apk`（61MB，含所有架构）
+   `NailongPet.apk`（61MB，含所有架构），传到手机（数据线 / 微信文件传输都行）
+   后点开安装；系统提示「未知来源」时允许一次。
+
+   > 只提供一个全架构包：之前分开的 arm64 单包在某些系统安装器上会报
+   > 「package info null」，干脆合并成一个，省心。
 2. 打开「奶龙桌宠」，三行权限都点成「已开启」：悬浮窗 / 日历 / 通知
 3. 点 **把奶龙放到桌面**，然后按 Home 回主屏幕，奶龙就在右下角了
 
@@ -81,7 +82,7 @@ python -m http.server 8788 --bind 0.0.0.0
 | 长按 | 让它笑：前两次播 6 秒版，第三次起笑到躺下 |
 | 拖动 | 挪位置，贴边吸附，下次打开还在原地；拖动也会重置静置计时 |
 | 静置 | 在设置区间里随机挑一秒笑（默认 30–90 秒），笑完重新计时进入下一轮；第 3 次播放完整彩蛋，然后冷却 5 分钟 |
-| 待机 | 站着不动，**随机**眨眼 / 连眨两下 / 转眼珠：大多 2.6–7 秒一次，偶尔发呆十几二十秒 |
+| 待机 | 播一整段站立动画，停 0.5–2 秒（设置里可调，上限 10 秒）再播；停顿随机，不是固定周期 |
 | 顶部按钮 | 待办 / 静音 / 设置（音量、奶龙大小、静置区间、振动、大笑开关、回位） |
 
 **静置计时的规则**：只有「碰到奶龙」（点它 / 长按 / 拖它）才重新计时。
@@ -103,7 +104,7 @@ python -m http.server 8788 --bind 0.0.0.0
 app/                 Flutter 工程（web + android）
   lib/               界面与状态机，见 lib/ 下的注释
   lib/services/desktop_bridge*.dart  Windows 桌面模式的桥接（拖动/气泡留白/右键菜单）
-  assets/pet/        idle.webp（站立定帧）/ blink.webp / blink2.webp / glance.webp / laugh.webp / egg.webp
+  assets/pet/        idle.webp / laugh.webp / egg.webp（透明动画）
   assets/audio/      laugh.mp3 / laugh_full.mp3 / tap.wav
   assets/fonts/      站酷快乐体（OFL）
   web/               manifest、PWA 图标、启动页、flutter_bootstrap.js
@@ -136,7 +137,7 @@ _work/               素材中间产物（可删，删了要重跑 tools/build_a
 python tools/build_assets.py key     # rembg 抠 521 帧（约 4 分钟）
 python tools/build_assets.py seg     # 拼 idle / laugh / egg
 python tools/build_assets.py webp    # 编码 laugh / egg
-python tools/build_assets.py eyes    # 待机定帧 + 眨眼 / 连眨 / 转眼珠
+python tools/build_assets.py eyes    # 待机整段（2.93 秒，正放+倒放）
 python tools/build_assets.py audio   # 切笑声、合成点击音
 python tools/make_icons.py           # 生成图标
 python tools/make_notify_icon.py     # 生成通知栏小图标
@@ -247,7 +248,7 @@ const GITHUB_REPO = 'ddyagoo/nailong-pet';
    跑 `tools\build_apk.ps1`
 2. Windows：改 `desktop/package.json` 的 `version`，先 `flutter build web --release`，
    再跑 `desktop\pack.ps1`
-3. GitHub 建一个 tag `v0.2.0` 的 Release，把 `NailongPet-arm64.apk` 和
+3. GitHub 建一个 tag `v0.2.0` 的 Release，把 `NailongPet.apk` 和
    `NailongPet-Setup-0.2.0.exe` 一起传上去
 4. 装旧版的人在 App 里点「检查更新」就能看到
 

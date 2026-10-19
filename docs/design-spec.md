@@ -64,18 +64,14 @@
    否则透明区残留的白色会渗进边缘，在暖色壁纸上形成一圈灰白
 4. 统一画布 597×804，缩放到宽 560（接近源分辨率）
 5. 拼三段：
-   - `idle.webp`：**一张站立定帧**（源视频 0–1.5s 里身体是静止的，动的只有眼皮）
-   - `blink.webp` / `blink2.webp` / `glance.webp`：眨眼、连眨两下、转眼珠，
-     首尾都回到定帧，App 用随机间隔穿插播放
+   - `idle.webp`：0–1.5s 正放 + 倒放（44 帧，2.93 秒，眨眼和眼珠来回都在里面）
    - `laugh.webp`：1.6–7.6s
    - `egg.webp`：1.6–17.43s（含倒地与源视频自带的硬切）
-6. 帧率：定帧 1 帧 / 眨眼与连眨 24fps / 转眼珠 15fps / laugh 24fps / egg 20fps；
-   WebP q76、alpha 质量 60
+6. 帧率：idle 15fps / laugh 24fps / egg 20fps；WebP q76、alpha 质量 60
 
-**为什么不再是一个循环**：源素材的待机片段把「眨眼 + 眼珠漂移」连在一起，
-正放倒放做循环时眨眼每 2.93 秒一次，节奏固定得像上发条。拆成独立片段后，
-间隔由 `EyeRhythm` 随机给：大多 2.6–7 秒，16% 概率发呆 12–22 秒；
-眨眼 70% / 转眼珠 22% / 连眨 8%。
+**待机节奏**：`idle.webp` 不循环播放，而是「播一次 → 停 0.5–2 秒（设置里可调，
+上限 10 秒）→ 再播」，停顿由 `BlinkRhythm` 随机取。动作保持第一版的整段，
+节奏却不固定。早先试过拆成眨眼 / 转眼珠小片段，动作太短、停顿太长，观感反而碎。
 
 音频（`ffmpeg`）：`laugh.mp3`（1.6–7.6s，尾部淡出）、`laugh_full.mp3`（1.68–17.28s），
 点击音由 Python 合成成 `tap.wav`。
@@ -88,12 +84,12 @@ lib/
   theme.dart                奶油暖黄 palette / 字体
   screens/home_scene.dart   模拟桌面、手机边框、顶部时钟
   ui/pet_layer.dart         奶龙本体：拖动、Q弹、长按菜单、气泡定位
-  ui/idle_pet.dart          待机定帧 + 随机眨眼 / 转眼珠
+  ui/idle_pet.dart          待机整段动画 + 随机停顿后重播
   ui/bubble.dart            今日播报卡片
   ui/settings_sheet.dart    音量、振动、大笑开关、回位
   ui/todo_sheet.dart        待办增删勾选
   pet/sprite_player.dart    自驱动 ui.Codec 的逐帧播放器（能停、能重播）
-  pet/eye_rhythm.dart       眼睛小动作的随机节奏（纯逻辑，可单测）
+  pet/eye_rhythm.dart       待机停顿的随机节奏（纯逻辑，可单测）
   pet/pet_brain.dart        40s/90–150s/3次/5min 状态机
   services/holiday_service.dart  日期/农历/节气/节日/调休
   services/todo_store.dart       待办（web 本地，Android 换系统日历）
@@ -109,8 +105,8 @@ lib/
 - **不能用 `Image` widget 播动画**：它会无限循环且没有结束回调。`sprite_player.dart`
   直接驱动 `ui.Codec.getNextFrame()`，按 `FrameInfo.duration` 计时，播完回调。
 - 三段动画常驻 `IndexedStack`，隐藏的那个暂停 ticker，避免每次重播重新解码。
-- 待机是一张定帧，眼睛的小片段按需挂载（播完就卸载），不占常驻内存；
-  单帧素材在 `SpritePlayer` 里直接跳过逐帧解码。
+- 待机只挂一个 `SpritePlayer`（`loop: false`），播完由 `IdlePet` 排一个随机停顿再
+  `restart()`，codec 常驻、不用重新解码。
 - 大笑结束的「压扁回弹」（220ms）把跨帧跳变藏在动作里。
 
 ## 5. Android 实现（已完成）
@@ -119,7 +115,7 @@ lib/
 |---|---|
 | 悬浮窗 | 前台服务 + `WindowManager`；宠物窗口 `TYPE_APPLICATION_OVERLAY`，气泡窗口单独一个（不抢焦点、可点击收起） |
 | 动画 | `AnimatedImageDrawable` 播同一批 WebP；API 26/27 退化成静态首帧 |
-| 待机眨眼 | 同一个 `Handler` 里排随机延时，到点把 drawable 换成 blink / blink2 / glance，播完切回定帧；片段末帧就是定帧，所以收尾晚一点也看不出来 |
+| 待机眨眼 | idle drawable 一次性播放（`repeatCount = 0`），2933ms 后按设置里的随机停顿（默认 0.5–2 秒，上限 10 秒）再 `start()`；笑的时候清掉待执行的计时 |
 | 日期/节日 | 构建期用 Dart 的 `lunar` 包生成 `calendar.json`（2024–2031），原生查表，避免重写农历算法 |
 | 待办 | `CalendarContract.Instances` 查今天，最多 6 条 |
 | 设置共享 | 读 Flutter 的 `FlutterSharedPreferences`（double 带 `VGhpcyBpcyB0aGUgcHJlZml4IGZvciBEb3VibGUu` 前缀） |
@@ -128,7 +124,7 @@ lib/
 | 签名 | `android/app/nailong-release.jks` + `key.properties`，release 构建自动使用 |
 | 构建 | `tools/build_apk.ps1`：先镜像到 `C:\nailong_build`（中文路径会让 AOT 快照器报错）再编 |
 
-产物：`dist/NailongPet-arm64.apk`（29MB，绝大多数手机）、`dist/NailongPet-universal.apk`（59MB，全架构兜底）。
+产物：`dist/NailongPet.apk`（61MB，全架构单包；不再单独出 arm64）。
 
 ## 6. 已知限制
 

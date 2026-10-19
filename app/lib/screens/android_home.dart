@@ -186,7 +186,11 @@ class _AndroidHomeState extends State<AndroidHome> with WidgetsBindingObserver {
               const SizedBox(height: 6),
               Text('把奶龙放到桌面上：点一下听今天，长按让它笑。', style: T.caption),
               const SizedBox(height: 18),
-              _PreviewCard(running: _running, scale: widget.settings.petScale),
+              _PreviewCard(
+                running: _running,
+                scale: widget.settings.petScale,
+                settings: widget.settings,
+              ),
               const SizedBox(height: 16),
               _Card(
                 children: [
@@ -332,10 +336,15 @@ class _AndroidHomeState extends State<AndroidHome> with WidgetsBindingObserver {
 }
 
 class _PreviewCard extends StatelessWidget {
-  const _PreviewCard({required this.running, required this.scale});
+  const _PreviewCard({
+    required this.running,
+    required this.scale,
+    required this.settings,
+  });
 
   final bool running;
   final double scale;
+  final SettingsService settings;
 
   @override
   Widget build(BuildContext context) {
@@ -353,7 +362,7 @@ class _PreviewCard extends StatelessWidget {
               height: 190,
               child: AspectRatio(
                 aspectRatio: 560 / 754,
-                child: const IdlePet(),
+                child: IdlePet(settings: settings),
               ),
             ),
           ),

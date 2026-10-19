@@ -4,36 +4,49 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:nailong_pet/pet/eye_rhythm.dart';
 
 void main() {
-  test('眼睛动作的间隔是随机的，不是固定周期', () {
-    final rhythm = EyeRhythm(rng: math.Random(7));
-    final gaps = [for (var i = 0; i < 400; i++) rhythm.nextDelayMs()];
+  test('默认停顿在 0.5–2 秒之间，而且是随机的', () {
+    final rhythm = BlinkRhythm(rng: math.Random(7));
+    final gaps = [for (var i = 0; i < 400; i++) rhythm.nextGapMs()];
 
-    // 都在设定区间内
     for (final g in gaps) {
-      final normal = g >= EyeRhythm.minGap && g <= EyeRhythm.maxGap;
-      final doze = g >= EyeRhythm.daydreamMin && g <= EyeRhythm.daydreamMax;
-      expect(normal || doze, isTrue, reason: '间隔 $g ms 超出范围');
+      expect(g, inInclusiveRange(BlinkRhythm.defaultMinMs,
+          BlinkRhythm.defaultMaxMs), reason: '停顿 $g ms 超出默认区间');
     }
-
-    // 至少几十种不同长度；如果像以前那样是固定周期，这里会是 1
+    // 固定周期的话这里会是 1
     expect(gaps.toSet().length, greaterThan(50));
-
-    // 发呆态大概占 16%，留点余量
-    final doze =
-        gaps.where((g) => g > EyeRhythm.maxGap).length / gaps.length;
-    expect(doze, inInclusiveRange(0.08, 0.26));
   });
 
-  test('片段按权重挑，三种都会出现', () {
-    final rhythm = EyeRhythm(rng: math.Random(11));
-    final counts = [0, 0, 0];
-    for (var i = 0; i < 3000; i++) {
-      counts[rhythm.pick(const [0.70, 0.22, 0.08])]++;
+  test('区间会被收进 0.5–10 秒的硬上下限', () {
+    final tooSmall = BlinkRhythm(minMs: 100, maxMs: 300);
+    expect(tooSmall.minMs, BlinkRhythm.floorMs);
+    expect(tooSmall.maxMs, BlinkRhythm.floorMs);
+    for (var i = 0; i < 20; i++) {
+      expect(tooSmall.nextGapMs(), BlinkRhythm.floorMs);
     }
-    expect(counts[0], greaterThan(counts[1]));
-    expect(counts[1], greaterThan(counts[2]));
-    expect(counts[2], greaterThan(0));
-    // 眨眼（含连眨）应该是主力
-    expect(counts[0] / 3000, closeTo(0.70, 0.04));
+
+    final tooBig = BlinkRhythm(minMs: 20000, maxMs: 60000);
+    expect(tooBig.minMs, BlinkRhythm.ceilMs);
+    expect(tooBig.maxMs, BlinkRhythm.ceilMs);
+    expect(tooBig.nextGapMs(), BlinkRhythm.ceilMs);
+  });
+
+  test('min 和 max 给反了会自动交换', () {
+    final (lo, hi) = BlinkRhythm.clampRange(4000, 1500);
+    expect(lo, 1500);
+    expect(hi, 4000);
+
+    final rhythm = BlinkRhythm(minMs: 3000, maxMs: 1000, rng: math.Random(3));
+    expect(rhythm.minMs, 1000);
+    expect(rhythm.maxMs, 3000);
+    for (final g in [for (var i = 0; i < 100; i++) rhythm.nextGapMs()]) {
+      expect(g, inInclusiveRange(1000, 3000));
+    }
+  });
+
+  test('min == max 时是固定间隔', () {
+    final rhythm = BlinkRhythm(minMs: 1200, maxMs: 1200, rng: math.Random(5));
+    for (var i = 0; i < 50; i++) {
+      expect(rhythm.nextGapMs(), 1200);
+    }
   });
 }
