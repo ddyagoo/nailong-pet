@@ -298,7 +298,15 @@ if (!app.requestSingleInstanceLock()) {
         if (!petWin) return;
         const img = await petWin.capturePage();
         fs.writeFileSync(path.join(__dirname, 'demo-shot.png'), img.toPNG());
-        app.quit();
+        // 顺手拍一张设置窗口，确认它能正常渲染
+        openSettings();
+        setTimeout(async () => {
+          if (settingsWin) {
+            const img2 = await settingsWin.capturePage();
+            fs.writeFileSync(path.join(__dirname, 'demo-settings.png'), img2.toPNG());
+          }
+          app.quit();
+        }, 5000);
       }, 9500);
     }
   });
