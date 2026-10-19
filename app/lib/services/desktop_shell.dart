@@ -20,8 +20,8 @@ class DesktopShell with TrayListener, WindowListener {
 
   static bool get isWindows => Platform.isWindows;
 
-  /// 窗口逻辑尺寸：够放下奶龙和它头上的气泡。
-  static const Size windowSize = Size(420, 820);
+  /// 窗口逻辑尺寸：够放下奶龙 + 头顶气泡，又能在 125% 缩放的 768 高屏幕上放得下。
+  static const Size windowSize = Size(420, 660);
 
   /// 窗口标题同时用来找 HWND，别改。
   static const String windowTitle = 'nailong_pet';
@@ -29,18 +29,66 @@ class DesktopShell with TrayListener, WindowListener {
   final navigatorKey = GlobalKey<NavigatorState>();
 
   int _hwnd = 0;
-  Rect? _hitArea;
-  bool _clickThrough = false;
+  List<Rect>? _hitAreas;
   bool _held = false;
-  Timer? _poll;
 
-  /// PetLayer 布局后上报：奶龙 + 气泡在窗口坐标系里的范围。
-  void setHitArea(Rect? rect) => _hitArea = rect;
+  /// PetLayer 布局后上报：可点击区域（窗口坐标，逻辑像素）。
+  ///
+  /// 奶龙待机时传的是「剪影列矩形」，所以两侧透明区也能点穿；气泡另算一块。
+  /// Windows 侧用 SetWindowRgn 把窗口裁成这些矩形的并集。
+  void setHitAreas(List<Rect> rects) {
+    if (_sameAreas(rects)) return;
+    _hitAreas = List<Rect>.from(rects);
+    _applyRegion();
+  }
 
-  /// 打开设置/对话框时临时要求可点击（这些界面比奶龙大）。
+  bool _sameAreas(List<Rect> rects) {
+    final old = _hitAreas;
+    if (old == null || old.length != rects.length) return false;
+    for (var i = 0; i < rects.length; i++) {
+      if (old[i] != rects[i]) return false;
+    }
+    return true;
+  }
+
+  /// 打开设置/对话框时临时要求整窗可点（这些界面比奶龙大）。
   void setInteractive(bool value) {
     _held = value;
-    if (value) _applyClickThrough(through: false);
+    _applyRegion();
+  }
+
+  /// 按「整窗」或「奶龙剪影 ∪ 气泡」裁剪窗口区域。
+  void _applyRegion() {
+    if (_hwnd == 0) return;
+    final (w, h) = Win32.windowSize(_hwnd);
+    if (w <= 0 || h <= 0) return;
+
+    final rects = _hitAreas;
+    if (_held || rects == null || rects.isEmpty) {
+      Win32.setRegionRects(_hwnd, [
+        [0, 0, w, h]
+      ]);
+      return;
+    }
+
+    final dpr = _devicePixelRatio;
+    final converted = <List<int>>[];
+    for (final r in rects) {
+      final left = (r.left * dpr).round().clamp(0, w);
+      final top = (r.top * dpr).round().clamp(0, h);
+      final right = (r.right * dpr).round().clamp(0, w);
+      final bottom = (r.bottom * dpr).round().clamp(0, h);
+      if (right - left >= 1 && bottom - top >= 1) {
+        converted.add([left, top, right, bottom]);
+      }
+    }
+    if (converted.isEmpty) {
+      Win32.setRegionRects(_hwnd, [
+        [0, 0, w, h]
+      ]);
+      return;
+    }
+    Win32.setRegionRects(_hwnd, converted);
   }
 
   Future<void> init() async {
@@ -77,7 +125,8 @@ class DesktopShell with TrayListener, WindowListener {
 
     windowManager.addListener(this);
     _hwnd = _findWindowHandle();
-    _poll = Timer.periodic(const Duration(milliseconds: 80), (_) => _tick());
+    _ensureOnScreen();
+    _applyRegion();
     await _setupTray();
   }
 
@@ -90,12 +139,27 @@ class DesktopShell with TrayListener, WindowListener {
     return '$base\\NailongPet\\window.txt';
   }
 
-  Future<void> _restorePosition() async {
-    final (screenW, screenH) = Win32.screenSize();
-    final right = screenW - windowSize.width - 24;
-    final bottom = screenH - windowSize.height - 48;
+  double get _devicePixelRatio {
+    final views = WidgetsBinding.instance.platformDispatcher.views;
+    if (views.isEmpty) return 1.0;
+    return views.first.devicePixelRatio;
+  }
 
-    var target = Offset(right, bottom);
+  /// 逻辑像素的**屏幕**尺寸。
+  ///
+  /// 注意：`FlutterView.physicalSize` 是窗口尺寸，不是屏幕尺寸，拿它当屏幕会把
+  /// 位置夹成 0,0；这里用 GetSystemMetrics 的物理像素除以缩放比。
+  Size get _logicalScreen {
+    final dpr = _devicePixelRatio;
+    final (w, h) = Win32.screenSize();
+    if (w <= 0 || h <= 0) return const Size(1280, 720);
+    return Size(w / dpr, h / dpr);
+  }
+
+  Future<void> _restorePosition() async {
+    // window_manager 的位置/尺寸都是逻辑像素；有记录就按记录，但必须夹回屏幕内
+    //（换分辨率/缩放比例后，旧坐标会把窗口丢到屏幕外）。
+    final screen = _logicalScreen;
     try {
       final f = File(_posFile);
       if (f.existsSync()) {
@@ -103,11 +167,32 @@ class DesktopShell with TrayListener, WindowListener {
         if (parts.length == 2) {
           final x = double.tryParse(parts[0].trim());
           final y = double.tryParse(parts[1].trim());
-          if (x != null && y != null) target = Offset(x, y);
+          if (x != null && y != null) {
+            final maxX = screen.width - windowSize.width;
+            final maxY = screen.height - windowSize.height;
+            final clamped = Offset(
+              x.clamp(0.0, maxX < 0 ? 0.0 : maxX),
+              y.clamp(0.0, maxY < 0 ? 0.0 : maxY),
+            );
+            await windowManager.setPosition(clamped);
+            return;
+          }
         }
       }
     } catch (_) {}
-    await windowManager.setPosition(target);
+    await windowManager.setAlignment(Alignment.bottomRight);
+  }
+
+  /// 兜底：万一窗口已经跑到屏幕外，拉回右下角。
+  void _ensureOnScreen() {
+    final rect = Win32.windowRect(_hwnd);
+    if (rect == null) return;
+    final dpr = _logicalScreen.width == 0 ? 1.0 : _devicePixelRatio;
+    final (left, top, right, bottom) = rect;
+    final screenW = (_logicalScreen.width * dpr).round();
+    final screenH = (_logicalScreen.height * dpr).round();
+    final ok = left < screenW - 60 && top < screenH - 60 && right > 60 && bottom > 60;
+    if (!ok) windowManager.setAlignment(Alignment.bottomRight);
   }
 
   void _savePosition() {
@@ -139,31 +224,8 @@ class DesktopShell with TrayListener, WindowListener {
 
   // ---------------- 点击穿透 ----------------
 
-  int _findWindowHandle() => Win32.findWindow(windowTitle);
-
-  void _tick() {
-    if (_held) return;
-    final hwnd = _hwnd;
-    final area = _hitArea;
-    if (hwnd == 0 || area == null) return;
-
-    final cursor = Win32.cursorPos();
-    final rect = Win32.windowRect(hwnd);
-    if (cursor == null || rect == null) return;
-
-    final local = Offset(
-      (cursor.$1 - rect.$1).toDouble(),
-      (cursor.$2 - rect.$2).toDouble(),
-    );
-    final inside = area.contains(local);
-    if (inside == !_clickThrough) return;
-    _applyClickThrough(through: !inside);
-  }
-
-  void _applyClickThrough({required bool through}) {
-    Win32.setClickThrough(_hwnd, through);
-    _clickThrough = through;
-  }
+  int _findWindowHandle() =>
+      Win32.findWindowByClass('FLUTTER_RUNNER_WIN32_WINDOW');
 
   // ---------------- 托盘 ----------------
 
@@ -287,7 +349,6 @@ class DesktopShell with TrayListener, WindowListener {
     _savePosition();
     trayManager.removeListener(this);
     windowManager.removeListener(this);
-    _poll?.cancel();
     await windowManager.destroy();
   }
 }

@@ -13,7 +13,15 @@ import '../services/settings_service.dart';
 /// 不再是死循环，而是每次播完停 0.5–2 秒（设置里可调，上限 10 秒）再播，
 /// 所以节奏不固定。
 class IdlePet extends StatefulWidget {
-  const IdlePet({super.key, required this.settings, this.enabled = true});
+  const IdlePet({
+    super.key,
+    required this.settings,
+    this.enabled = true,
+    this.decodeWidth,
+  });
+
+  /// 解码目标宽度（物理像素）。
+  final int? decodeWidth;
 
   final SettingsService settings;
 
@@ -73,7 +81,8 @@ class _IdlePetState extends State<IdlePet> {
 
   void _restartNow() {
     _cancelGap();
-    _playerKey.currentState?.restart();
+    // 笑的时候播放器被暂停在中间帧，必须重新解码才会回到第一帧（睁眼）
+    _playerKey.currentState?.reset();
   }
 
   /// 一段播完：按随机停顿排下一段。
@@ -91,6 +100,7 @@ class _IdlePetState extends State<IdlePet> {
     return SpritePlayer(
       key: _playerKey,
       asset: 'assets/pet/idle.webp',
+      decodeWidth: widget.decodeWidth,
       loop: false,
       playing: widget.enabled,
       onFinished: _onFinished,

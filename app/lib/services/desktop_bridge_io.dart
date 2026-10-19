@@ -26,9 +26,9 @@ class DesktopBridge {
     if (active) DesktopShell.instance.popUpMenu();
   }
 
-  /// 上报「奶龙 + 气泡」在窗口里的范围，用来做点击穿透。
-  static void reportHitArea(Rect? rect) {
-    if (active) DesktopShell.instance.setHitArea(rect);
+  /// 上报可点击区域（窗口坐标，逻辑像素）。传多个矩形就是不规则区域。
+  static void reportHitAreas(List<Rect> rects) {
+    if (active) DesktopShell.instance.setHitAreas(rects);
   }
 
   /// 打开设置/对话框时整窗可点。

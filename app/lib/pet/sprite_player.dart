@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:flutter/services.dart';
 
+
 /// 逐帧播放一张 animated WebP。
 ///
 /// 没有用 `Image` widget，因为它的多帧播放会无限循环、也不给结束回调；
@@ -15,12 +16,16 @@ class SpritePlayer extends StatefulWidget {
     this.loop = true,
     this.playing = true,
     this.onFinished,
+    this.decodeWidth,
   });
 
   final String asset;
   final bool loop;
   final bool playing;
   final VoidCallback? onFinished;
+
+  /// 解码目标宽度（物理像素）。给 null 就按原图解码。
+  final int? decodeWidth;
 
   @override
   State<SpritePlayer> createState() => SpritePlayerState();
@@ -77,7 +82,11 @@ class SpritePlayerState extends State<SpritePlayer>
     _loading = true;
     try {
       final data = await rootBundle.load(widget.asset);
-      final codec = await ui.instantiateImageCodec(data.buffer.asUint8List());
+      final target = widget.decodeWidth;
+      final codec = await ui.instantiateImageCodec(
+        data.buffer.asUint8List(),
+        targetWidth: target != null && target > 32 ? target : null,
+      );
       if (!mounted) {
         codec.dispose();
         return;
@@ -160,6 +169,16 @@ class SpritePlayerState extends State<SpritePlayer>
     _finished = false;
     _shown = 0;
     _accum = Duration.zero;
+  }
+
+  /// 从头重新解码播放，用于「动画被暂停在中间帧之后」的场景。
+  ///
+  /// restart() 只重置计数，画面会从停住的那一帧接着走（笑完回来停在半闭眼
+  /// 就是这个问题），所以被打断后要用这个重新解码。
+  void reset() {
+    _finished = false;
+    _accum = Duration.zero;
+    _load();
   }
 
   @override

@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../pet/pet_brain.dart';
+import '../pet/silhouette.dart';
 import '../pet/sprite_player.dart';
 import '../services/audio_service.dart';
 import '../services/desktop_bridge.dart';
@@ -45,6 +46,10 @@ class PetLayerState extends State<PetLayer> with TickerProviderStateMixin {
   final _holiday = const HolidayService();
   final _laughKey = GlobalKey<SpritePlayerState>();
   final _bubbleKey = GlobalKey();
+  final _petRectKey = GlobalKey();
+
+  /// 待机剪影：用来把可点区域裁成跟着身形走的形状。
+  Silhouette? _silhouette;
 
   late final AnimationController _bounce;
   late final Animation<double> _scale;
@@ -108,8 +113,17 @@ class PetLayerState extends State<PetLayer> with TickerProviderStateMixin {
     ]).animate(_snap);
     _pulse = Listenable.merge([_scale, _snapScale]);
     widget.brain.onLaughStart = _onLaughStart;
+    widget.brain.addListener(_onBrain);
+    Silhouette.load('assets/pet/idle.webp').then((s) {
+      if (mounted && s != null) setState(() => _silhouette = s);
+    });
     widget.settings.addListener(_onSettings);
     _restorePosition();
+  }
+
+  /// 状态机变了（笑完回到待机）要立刻重建，否则会一直停在笑声动画的最后一帧。
+  void _onBrain() {
+    if (mounted) setState(() {});
   }
 
   void _onSettings() {
@@ -118,6 +132,7 @@ class PetLayerState extends State<PetLayer> with TickerProviderStateMixin {
 
   @override
   void dispose() {
+    widget.brain.removeListener(_onBrain);
     widget.settings.removeListener(_onSettings);
     _bounce.dispose();
     _snap.dispose();
@@ -272,7 +287,7 @@ class PetLayerState extends State<PetLayer> with TickerProviderStateMixin {
       final pos = _pos!;
       final bubbleAbove = widget.desktop || pos.dy > 360;
 
-      _reportHitArea(c.maxWidth, pos, petH, bubbleAbove);
+      _reportHitArea();
 
       return Stack(
         children: [
@@ -298,6 +313,7 @@ class PetLayerState extends State<PetLayer> with TickerProviderStateMixin {
             width: _petW,
             height: petH,
             child: GestureDetector(
+              key: _petRectKey,
               behavior: HitTestBehavior.opaque,
               onTap: _poke,
               onLongPress: _longPress,
@@ -361,22 +377,29 @@ class PetLayerState extends State<PetLayer> with TickerProviderStateMixin {
                         ),
                       ),
                     ),
-                    IndexedStack(
-                      index: widget.brain.mood == PetMood.idle ? 0 : 1,
-                      children: [
-                        IdlePet(
-                          settings: widget.settings,
-                          enabled: widget.brain.mood == PetMood.idle,
-                        ),
-                        SpritePlayer(
-                          key: _laughKey,
-                          asset: _laughAsset,
-                          loop: false,
-                          playing: widget.brain.mood == PetMood.laughing,
-                          onFinished: _onLaughFinished,
-                        ),
-                      ],
-                    ),
+                    Builder(builder: (context) {
+                      final dpr = MediaQuery.of(context).devicePixelRatio;
+                      final decodeW = (_petW * dpr).round();
+                      return IndexedStack(
+                        index: widget.brain.mood == PetMood.idle ? 0 : 1,
+                        children: [
+                          IdlePet(
+                            settings: widget.settings,
+                            enabled: widget.brain.mood == PetMood.idle,
+                            decodeWidth: decodeW,
+                          ),
+                          SpritePlayer(
+                            key: _laughKey,
+                            asset: _laughAsset,
+                            loop: false,
+                            playing:
+                                widget.brain.mood == PetMood.laughing,
+                            decodeWidth: decodeW,
+                            onFinished: _onLaughFinished,
+                          ),
+                        ],
+                      );
+                    }),
                   ],
                 ),
               ),
@@ -388,23 +411,39 @@ class PetLayerState extends State<PetLayer> with TickerProviderStateMixin {
   }
 
   /// 把「奶龙 + 气泡」的范围报给 Windows 外壳，用来做点击穿透。
-  void _reportHitArea(double sceneW, Offset pos, double petH, bool bubbleAbove) {
+  ///
+  /// 直接从渲染对象取全局矩形，不再自己按 petW/petH 算：DPI 缩放、布局变化
+  /// 都不会算错。
+  void _reportHitArea() {
     if (!widget.desktop) return;
-    final petRect = Rect.fromLTWH(pos.dx, pos.dy, _petW, petH);
-    var hit = petRect.inflate(_petW * 0.12);
-
-    if (_bubble && _day != null) {
-      final box = _bubbleKey.currentContext?.findRenderObject() as RenderBox?;
-      final w = box?.size.width ?? PetBubble.maxWidth.toDouble();
-      final h = box?.size.height ?? 260;
-      final left = _bubbleLeft(sceneW, pos);
-      final top = bubbleAbove ? pos.dy - h - 6 : pos.dy + petH + 12;
-      hit = hit.expandToInclude(Rect.fromLTWH(left, top, w, h));
-    }
-
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) DesktopBridge.reportHitArea(hit);
+      if (!mounted) return;
+
+      final petBox = _renderRect(_petRectKey);
+      if (petBox == null) return;
+
+      final rects = <Rect>[];
+      final idle = widget.brain.mood == PetMood.idle;
+      final mask = _silhouette;
+      if (idle && mask != null) {
+        // 按身形裁：两侧透明区也能点穿（顺带按 1.18 放大，盖住 Q 弹）
+        rects.addAll(mask.toRects(petBox));
+      } else {
+        // 笑的时候姿势变化大，直接给整块（留 6% 余量）
+        rects.add(petBox.inflate(petBox.width * 0.06));
+      }
+
+      final bubble = _renderRect(_bubbleKey);
+      if (bubble != null) rects.add(bubble.inflate(6));
+
+      DesktopBridge.reportHitAreas(rects);
     });
+  }
+
+  Rect? _renderRect(GlobalKey key) {
+    final box = key.currentContext?.findRenderObject() as RenderBox?;
+    if (box == null || !box.hasSize) return null;
+    return box.localToGlobal(Offset.zero) & box.size;
   }
 
   double _bubbleLeft(double sceneW, Offset pos) {

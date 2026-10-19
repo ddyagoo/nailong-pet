@@ -1,6 +1,7 @@
 import 'dart:js_interop';
 
 import 'package:flutter/foundation.dart';
+import 'package:flutter/widgets.dart';
 
 /// 这几个函数由 Electron 的 preload.js 注入到 window 上。
 @JS('desktopDragStart')
@@ -36,4 +37,8 @@ class DesktopBridge {
   static void menu() {
     if (active) _desktopMenu();
   }
+
+  static void reportHitAreas(List<Rect> rects) {}
+
+  static void setInteractive(bool value) {}
 }
