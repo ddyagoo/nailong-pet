@@ -27,6 +27,10 @@ desktop/demo-shot.png
 _work/
 _probe/
 
+# ---- 本机工作笔记：给 agent 看的路径/账号/环境坑，不进仓库 ----
+AGENTS.md
+CLAUDE.md
+
 # ---- 编辑器 / 系统 ----
 .idea/
 .vscode/
