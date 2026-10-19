@@ -5,13 +5,17 @@
 
 两种形态：
 
-- **Android**：真·桌宠，奶龙浮在任何 App 之上（`dist/NailongPet-arm64.apk`）
-- **Windows**：透明置顶窗口 + 托盘，安装程序（`dist/windows/NailongPet-Setup-0.1.0.exe`）
+- **Android**：真·桌宠，奶龙浮在任何 App 之上（`NailongPet-arm64.apk`）
+- **Windows**：透明置顶窗口 + 托盘，安装程序（`NailongPet-Setup-0.1.0.exe`，82MB）
 - **web**：模拟手机桌面，用来快速看效果（见下面的「跑起来」）
+
+**下载**：<https://github.com/ddyagoo/nailong-pet/releases/latest>
+（下面提到的 `dist/` 是本机跑完构建后的产物目录）
 
 ## 装到电脑上（Windows）
 
-1. 下载 `dist/windows/NailongPet-Setup-0.1.0.exe`（82MB），双击安装
+1. 从 [Releases](https://github.com/ddyagoo/nailong-pet/releases/latest) 下载
+   `NailongPet-Setup-0.1.0.exe`（82MB），双击安装
 2. 装完自动创建桌面和开始菜单快捷方式「奶龙桌宠」，打开后奶龙出现在屏幕右下角
 
 - **左键拖动**：挪位置
@@ -35,10 +39,11 @@
 
 ## 装到手机上（Android）
 
-1. 把 `dist/NailongPet-arm64.apk` 传到手机（数据线 / 微信文件传输都行），点开安装；
+1. 从 [Releases](https://github.com/ddyagoo/nailong-pet/releases/latest) 下载
+   `NailongPet-arm64.apk`，传到手机（数据线 / 微信文件传输都行）后点开安装；
    系统提示「未知来源」时允许一次。
-   - arm64 版 29MB，绝大多数手机（含红米）都用这个
-   - 万一提示「应用未安装」，换 `dist/NailongPet-universal.apk`（59MB，含所有架构）
+   - arm64 版 30MB，绝大多数手机（含红米）都用这个
+   - 万一提示「应用未安装」，换 `NailongPet-universal.apk`（61MB，含所有架构）
 2. 打开「奶龙桌宠」，三行权限都点成「已开启」：悬浮窗 / 日历 / 通知
 3. 点 **把奶龙放到桌面**，然后按 Home 回主屏幕，奶龙就在右下角了
 
@@ -198,22 +203,25 @@ cd desktop; .\run.ps1                          # 从源码跑，第一次会自�
 
 ## 发到 GitHub / 应用内更新
 
-仓库根目录已经 `git init` 并提交过，`.gitignore` 排除了：
+仓库：<https://github.com/ddyagoo/nailong-pet>（**必须是 public**，自动更新走匿名 API，
+私有仓库会让「检查更新」一直 404）
+
+`.gitignore` 排除了：
 
 - `app/android/key.properties`、`*.jks`（签名密码，**千万别传**）
 - `dist/`、`*.apk`（APK 走 GitHub Releases）
 - `_work/`、`_probe/`（几百 MB 的素材中间产物）
 - `app/build/`、`.dart_tool/`、`.gradle/` 等构建目录
 
-推送：
+推新提交：
 
 ```powershell
-git remote add origin https://github.com/ddyagoo/nailong-pet.git
-git branch -M main
-git push -u origin main
+git add -A
+git commit -m "改了什么"
+git push
 ```
 
-**应用内更新**：仓库地址写在两处，换仓库时两边都要改、保持一致：
+**应用内更新**：仓库地址写在两处，fork 到别的账号时两边都要改、保持一致：
 
 ```kotlin
 // app/android/app/src/main/kotlin/com/tomori/nailong_pet/UpdateChecker.kt
