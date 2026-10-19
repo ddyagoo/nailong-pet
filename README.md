@@ -143,7 +143,8 @@ python tools/make_notify_icon.py     # 生成通知栏小图标
 cd app && dart run tool/gen_calendar.dart   # 生成 2024–2031 的日历表
 ```
 
-源视频路径写死在 `tools/build_assets.py` 顶部（`VIDEO`），换素材改那里。
+源视频路径在 `tools/build_assets.py` 顶部（`VIDEO`）：默认读环境变量 `NAILONG_VIDEO`，
+没设的话找 `_work/source.mp4`。换素材就把录屏放那儿，或者设环境变量。
 
 ## 打 APK
 
@@ -155,7 +156,8 @@ powershell -ExecutionPolicy Bypass -File tools\build_apk.ps1
 `Unable to read file ... app.dill`，Gradle 里已经用 `android.overridePathCheck=true`
 绕过了 AGP 的检查，但 AOT 这一步只能靠纯英文路径。
 
-签名用的是 `android/app/nailong-release.jks`，密码写在 `android/key.properties`：
+签名用的是 `android/app/nailong-release.jks`，密码写在 `android/key.properties`
+（**这个文件和 `.jks` 都不进仓库**，格式是三行）：
 
 ```
 storePassword=<你自己的密码>
@@ -163,7 +165,8 @@ keyPassword=<你自己的密码>
 keyAlias=nailong
 ```
 
-**这个 keystore 要留着**，以后升级同一个 App 必须用同一把钥匙，否则只能卸载重装。
+**keystore 和密码都要另存一份备份**：以后升级同一个 App 必须用同一把钥匙，
+丢了就只能换包名重新发，老用户也收不到更新了。
 
 ## 打 Windows 安装包
 

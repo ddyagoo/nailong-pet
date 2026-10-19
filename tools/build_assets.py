@@ -24,7 +24,8 @@ KEYED = ROOT / "_work" / "keyed"
 CLIPS = ROOT / "_work" / "clips"
 ASSETS = ROOT / "app" / "assets" / "pet"
 AUDIO = ROOT / "app" / "assets" / "audio"
-VIDEO = Path(r"C:\path\to\source.mp4")
+# 源视频自己放：默认读环境变量 NAILONG_VIDEO，没有就用 _work/source.mp4
+VIDEO = Path(os.environ.get("NAILONG_VIDEO", ROOT / "_work" / "source.mp4"))
 
 FPS = 30
 # Source timeline (seconds) measured from the recording.
