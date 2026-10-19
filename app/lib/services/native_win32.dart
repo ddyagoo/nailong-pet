@@ -45,6 +45,10 @@ class Win32 {
       _gdi32.lookupFunction<IntPtr Function(Int32, Int32, Int32, Int32),
           int Function(int, int, int, int)>('CreateRectRgn');
 
+  static final int Function(int, int, int, int) _postMessage =
+      _user32.lookupFunction<Int32 Function(IntPtr, Uint32, IntPtr, IntPtr),
+          int Function(int, int, int, int)>('PostMessageW');
+
   static final int Function(int, int, int, int) _combineRgn =
       _gdi32.lookupFunction<Int32 Function(IntPtr, IntPtr, IntPtr, Int32),
           int Function(int, int, int, int)>('CombineRgn');
@@ -112,6 +116,15 @@ class Win32 {
     final rect = windowRect(hwnd);
     if (rect == null) return (0, 0);
     return (rect.$3 - rect.$1, rect.$4 - rect.$2);
+  }
+
+  /// 和自己点标题栏关闭一样：发 WM_CLOSE 让窗口正常退出。
+  ///
+  /// 比 window_manager.destroy() 快得多（后者要等引擎和插件收尾，实测 ~15 秒）。
+  static void postClose(int hwnd) {
+    if (hwnd == 0) return;
+    const wmClose = 0x0010;
+    _postMessage(hwnd, wmClose, 0, 0);
   }
 
   static (int, int) screenSize() =>

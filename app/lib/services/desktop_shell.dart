@@ -349,6 +349,14 @@ class DesktopShell with TrayListener, WindowListener {
     _savePosition();
     trayManager.removeListener(this);
     windowManager.removeListener(this);
-    await windowManager.destroy();
+
+    // 用 WM_CLOSE 走「关窗口」那条路：0.3 秒就退干净。
+    // window_manager.destroy() 要等引擎和插件收尾，实测卡 15 秒。
+    Win32.postClose(_hwnd);
+
+    // 兜底：万一消息没生效，1 秒后硬退
+    Timer(const Duration(seconds: 3), () {
+      exit(0);
+    });
   }
 }
