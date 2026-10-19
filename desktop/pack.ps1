@@ -18,6 +18,26 @@ $dstWeb = Join-Path $here 'web'
 if (Test-Path $dstWeb) { Remove-Item -Recurse -Force $dstWeb }
 Copy-Item $web $dstWeb -Recurse
 
+# Flutter 会把所有渲染器变体都塞进构建产物，这里只留 JS 版实际会加载的那几个：
+#   chromium/        —— CanvasKit 的另一份 wasm（bootstrap 已固定 full 变体）
+#   skwasm*/wimp*    —— --wasm 构建用的渲染器，我们是 JS 构建，永远不会请求
+#   *.symbols        —— 调试符号
+# 合起来约 23MB，占安装包的三分之一。
+Write-Host '== 精简 canvaskit 变体 ==' -ForegroundColor Cyan
+$ck = Join-Path $dstWeb 'canvaskit'
+foreach ($item in @(
+    'chromium',
+    'skwasm.js', 'skwasm.js.symbols', 'skwasm.wasm',
+    'skwasm_heavy.js', 'skwasm_heavy.js.symbols', 'skwasm_heavy.wasm',
+    'wimp.js', 'wimp.js.symbols', 'wimp.wasm',
+    'canvaskit.js.symbols'
+  )) {
+  $target = Join-Path $ck $item
+  if (Test-Path $target) { Remove-Item $target -Recurse -Force }
+}
+$webSize = (Get-ChildItem $dstWeb -Recurse -File | Measure-Object Length -Sum).Sum / 1MB
+Write-Host ("web 目录精简后：{0:N1} MB" -f $webSize) -ForegroundColor Cyan
+
 Write-Host '== electron-builder (nsis) ==' -ForegroundColor Cyan
 Remove-Item Env:ELECTRON_RUN_AS_NODE -ErrorAction SilentlyContinue
 Push-Location $here

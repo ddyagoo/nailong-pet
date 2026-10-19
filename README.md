@@ -11,7 +11,7 @@
 
 ## 装到电脑上（Windows）
 
-1. 下载 `dist/windows/NailongPet-Setup-0.1.0.exe`（95MB），双击安装
+1. 下载 `dist/windows/NailongPet-Setup-0.1.0.exe`（82MB），双击安装
 2. 装完自动创建桌面和开始菜单快捷方式「奶龙桌宠」，打开后奶龙出现在屏幕右下角
 
 - **左键拖动**：挪位置
@@ -169,6 +169,13 @@ cd desktop; .\run.ps1                          # 从源码跑，第一次会自�
 ```
 
 - `pack.ps1` 会把 `app/build/web` 同步到 `desktop/web`，再交给 electron-builder 出 NSIS 安装包
+- 同步完会**精简 canvaskit**：只留 JS 版渲染器要用的 `canvaskit.js/.wasm`，删掉
+  `chromium/`（另一份 wasm）、`skwasm*/wimp*`（`--wasm` 构建才用）、`*.symbols`（调试符号），
+  合起来约 23MB。`app/web/flutter_bootstrap.js` 里固定了 `canvasKitVariant: "full"`，
+  保证不会去请求删掉的变体
+- 安装包体积约 **82MB**，其中 60MB 以上是 Electron 自带的 Chromium 内核（`NailongPet.exe`
+  本身就有 180MB，压缩后仍是大头），真正的内容（宠物动画 9MB + 字体 + 逻辑）不到 15MB。
+  想再小只能换 WebView2 外壳
 - 安装包是 `oneClick=false`（可以选安装目录）、装完建桌面 + 开始菜单快捷方式，卸载走系统「应用」
 - `desktop/run.ps1` 会检查 `node_modules/electron/dist/electron.exe`，没有就 `npm install`，
   装不上就自动从 npmmirror 拉 zip 解压（国内直连 GitHub 经常失败）

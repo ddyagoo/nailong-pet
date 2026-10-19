@@ -6,6 +6,9 @@
 _flutter.loader.load({
   config: {
     canvasKitBaseUrl: "canvaskit/",
+    // 固定用 full 版：auto 在 Chromium 上会去拉 canvaskit/chromium/，
+    // 那份 5.7MB 在打包时已经删掉了
+    canvasKitVariant: "full",
   },
   serviceWorkerSettings: {
     serviceWorkerVersion: {{flutter_service_worker_version}},

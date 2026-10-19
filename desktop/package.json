@@ -17,6 +17,8 @@
   "build": {
     "appId": "com.tomori.nailong_pet",
     "productName": "NailongPet",
+    "compression": "maximum",
+    "electronLanguages": ["zh-CN", "en-US"],
     "directories": {
       "output": "../dist/windows"
     },
