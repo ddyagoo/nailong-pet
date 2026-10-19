@@ -173,32 +173,81 @@ def stage_seg() -> None:
     print("egg frames", len(egg))
 
 
-def stage_webp() -> None:
+def _encode(name: str, frames: list[Image.Image], fps: float,
+            quality: int = 76) -> None:
     ASSETS.mkdir(parents=True, exist_ok=True)
-    # 文件名 -> (目标帧率, WebP 质量)。idle 只是轻微晃动，15fps 够；
+    out = ASSETS / f"{name}.webp"
+    frames[0].save(
+        out, "WEBP", save_all=True, append_images=frames[1:],
+        duration=int(round(1000 / fps)), loop=0, quality=quality,
+        method=6, alpha_quality=60, minimize_size=True,
+    )
+    print(f"{out.name}: {len(frames)} frames @ {fps:g}fps, "
+          f"{out.stat().st_size/1e3:.0f} kB")
+
+
+def _resample(name: str, fps: float) -> list[Image.Image]:
+    """Take a clip folder and resample it from 30fps to *fps*."""
+    files = sorted(CLIPS.glob(f"{name}_*.png"))
+    if not files:
+        sys.exit(f"run seg first (no {name}_*.png)")
+    step = FPS / fps
+    frames: list[Image.Image] = []
+    k = 0
+    while True:
+        idx = int(round(k * step))
+        if idx >= len(files):
+            break
+        frames.append(Image.open(files[idx]).convert("RGBA"))
+        k += 1
+    return frames
+
+
+def stage_webp() -> None:
     # 笑声动作快，保 24fps；彩蛋很少播，20fps 省体积。
-    specs = {"idle": (15, 76), "laugh": (24, 78), "egg": (20, 76)}
-    for name, (fps, quality) in specs.items():
-        files = sorted(CLIPS.glob(f"{name}_*.png"))
-        if not files:
-            continue
-        step = FPS / fps
-        frames: list[Image.Image] = []
-        k = 0
-        while True:
-            idx = int(round(k * step))
-            if idx >= len(files):
-                break
-            frames.append(Image.open(files[idx]).convert("RGBA"))
-            k += 1
-        out = ASSETS / f"{name}.webp"
-        frames[0].save(
-            out, "WEBP", save_all=True, append_images=frames[1:],
-            duration=int(round(1000 / fps)), loop=0, quality=quality,
-            method=6, alpha_quality=60, minimize_size=True,
-        )
-        print(f"{out.name}: {len(frames)} frames @ {fps}fps, "
-              f"{out.stat().st_size/1e6:.2f} MB")
+    for name, (fps, quality) in {"laugh": (24, 78), "egg": (20, 76)}.items():
+        _encode(name, _resample(name, fps), fps, quality)
+
+
+def stage_eyes() -> None:
+    """待机 + 眼睛小动作。
+
+    待机就是一张定帧（源视频里身体本来就是静止的，只有眼皮在动）。
+    眨眼 / 连眨 / 转眼珠拆成独立小片段，由 App 用随机间隔穿插播放，
+    这样眼睛动的节奏才不是固定周期。
+    """
+    files = sorted(CLIPS.glob("idle_*.png"))
+    if not files:
+        sys.exit("run seg first")
+
+    def load(i: int) -> Image.Image:
+        return Image.open(files[i]).convert("RGBA")
+
+    NEUTRAL = 0   # 站立定帧：笑完回到待机也是这一帧
+    OPEN = 18     # 眨完重新睁眼，≈ NEUTRAL（误差 <1px）
+    GAZE = 42     # 眼珠看到最右边
+
+    # 定帧待机
+    _encode("idle", [load(NEUTRAL)], 15)
+
+    # 眨眼：0→闭→睁（源 19 帧 0.63s，24fps 重采样后略快，眨眼利落一点）
+    blink_src = list(range(NEUTRAL, OPEN + 1, 2))
+    if blink_src[-1] != OPEN:
+        blink_src.append(OPEN)
+    blink = [load(i) for i in blink_src]
+
+    # 回到定帧，保证和 idle 首帧严丝合缝
+    _encode("blink", blink + [load(NEUTRAL)], 24)
+
+    # 连眨两下：中间留 3 帧睁眼
+    hold = [load(OPEN)] * 3
+    again = [load(i) for i in blink_src[1:]]
+    _encode("blink2", blink + hold + again + [load(NEUTRAL)], 24)
+
+    # 转眼珠：往右瞟再瞟回来（源视频原本就是靠 ping-pong 回位的）
+    out = [NEUTRAL] + list(range(OPEN, GAZE + 1, 2))
+    back = list(range(GAZE - 2, OPEN - 1, -2))
+    _encode("glance", [load(i) for i in out + back + [NEUTRAL]], 15)
 
 
 def _run(cmd: list[str]) -> None:
@@ -239,7 +288,13 @@ def stage_audio() -> None:
         print(p.name, f"{p.stat().st_size/1e3:.0f} kB")
 
 
-STAGES = {"key": stage_key, "seg": stage_seg, "webp": stage_webp, "audio": stage_audio}
+STAGES = {
+    "key": stage_key,
+    "seg": stage_seg,
+    "webp": stage_webp,
+    "eyes": stage_eyes,
+    "audio": stage_audio,
+}
 
 
 def main() -> None:

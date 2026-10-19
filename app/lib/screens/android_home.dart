@@ -4,6 +4,7 @@ import '../services/overlay_bridge.dart';
 import '../services/settings_service.dart';
 import '../services/todo_store.dart';
 import '../theme.dart';
+import '../ui/idle_pet.dart';
 import '../ui/settings_sheet.dart';
 import '../ui/todo_sheet.dart';
 
@@ -348,10 +349,12 @@ class _PreviewCard extends StatelessWidget {
       child: Stack(
         children: [
           Center(
-            child: Image.asset(
-              'assets/pet/idle.webp',
+            child: SizedBox(
               height: 190,
-              fit: BoxFit.contain,
+              child: AspectRatio(
+                aspectRatio: 560 / 754,
+                child: const IdlePet(),
+              ),
             ),
           ),
           Positioned(

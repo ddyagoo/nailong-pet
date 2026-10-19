@@ -76,6 +76,7 @@ python -m http.server 8788 --bind 0.0.0.0
 | 长按 | 让它笑：前两次播 6 秒版，第三次起笑到躺下 |
 | 拖动 | 挪位置，贴边吸附，下次打开还在原地；拖动也会重置静置计时 |
 | 静置 | 在设置区间里随机挑一秒笑（默认 30–90 秒），笑完重新计时进入下一轮；第 3 次播放完整彩蛋，然后冷却 5 分钟 |
+| 待机 | 站着不动，**随机**眨眼 / 连眨两下 / 转眼珠：大多 2.6–7 秒一次，偶尔发呆十几二十秒 |
 | 顶部按钮 | 待办 / 静音 / 设置（音量、奶龙大小、静置区间、振动、大笑开关、回位） |
 
 **静置计时的规则**：只有「碰到奶龙」（点它 / 长按 / 拖它）才重新计时。
@@ -97,7 +98,7 @@ python -m http.server 8788 --bind 0.0.0.0
 app/                 Flutter 工程（web + android）
   lib/               界面与状态机，见 lib/ 下的注释
   lib/services/desktop_bridge*.dart  Windows 桌面模式的桥接（拖动/气泡留白/右键菜单）
-  assets/pet/        idle.webp / laugh.webp / egg.webp（透明动画）
+  assets/pet/        idle.webp（站立定帧）/ blink.webp / blink2.webp / glance.webp / laugh.webp / egg.webp
   assets/audio/      laugh.mp3 / laugh_full.mp3 / tap.wav
   assets/fonts/      站酷快乐体（OFL）
   web/               manifest、PWA 图标、启动页、flutter_bootstrap.js
@@ -129,7 +130,8 @@ _work/               素材中间产物（可删，删了要重跑 tools/build_a
 ```powershell
 python tools/build_assets.py key     # rembg 抠 521 帧（约 4 分钟）
 python tools/build_assets.py seg     # 拼 idle / laugh / egg
-python tools/build_assets.py webp    # 编码 WebP
+python tools/build_assets.py webp    # 编码 laugh / egg
+python tools/build_assets.py eyes    # 待机定帧 + 眨眼 / 连眨 / 转眼珠
 python tools/build_assets.py audio   # 切笑声、合成点击音
 python tools/make_icons.py           # 生成图标
 python tools/make_notify_icon.py     # 生成通知栏小图标

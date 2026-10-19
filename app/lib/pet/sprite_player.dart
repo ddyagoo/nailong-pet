@@ -115,6 +115,8 @@ class SpritePlayerState extends State<SpritePlayer>
         _codec == null) {
       return;
     }
+    // 单帧素材（定帧待机）不用逐帧重解码
+    if (_frameCount <= 1) return;
     _accum += dt;
     if (_accum < _step) return;
     _accum = Duration.zero;

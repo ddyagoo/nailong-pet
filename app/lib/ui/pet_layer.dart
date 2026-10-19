@@ -12,6 +12,7 @@ import '../services/holiday_service.dart';
 import '../services/settings_service.dart';
 import '../services/todo_store.dart';
 import 'bubble.dart';
+import 'idle_pet.dart';
 
 /// 画布宽高比（来自抠图裁切框 597x804）。
 const double kSpriteAspect = 597 / 804;
@@ -42,7 +43,6 @@ class PetLayerState extends State<PetLayer> with TickerProviderStateMixin {
   static const _posKey = 'pet_pos';
 
   final _holiday = const HolidayService();
-  final _idleKey = GlobalKey<SpritePlayerState>();
   final _laughKey = GlobalKey<SpritePlayerState>();
 
   late final AnimationController _bounce;
@@ -360,12 +360,7 @@ class PetLayerState extends State<PetLayer> with TickerProviderStateMixin {
                     IndexedStack(
                       index: widget.brain.mood == PetMood.idle ? 0 : 1,
                       children: [
-                        SpritePlayer(
-                          key: _idleKey,
-                          asset: 'assets/pet/idle.webp',
-                          loop: true,
-                          playing: widget.brain.mood == PetMood.idle,
-                        ),
+                        IdlePet(enabled: widget.brain.mood == PetMood.idle),
                         SpritePlayer(
                           key: _laughKey,
                           asset: _laughAsset,
