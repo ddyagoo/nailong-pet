@@ -13,7 +13,7 @@ import java.net.URL
  */
 object UpdateChecker {
 
-    const val REPO = "tomori/nailong-pet"
+    const val REPO = "ddyagoo/nailong-pet"
     const val RELEASES_PAGE = "https://github.com/$REPO/releases"
 
     data class Result(

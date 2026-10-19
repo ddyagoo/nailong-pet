@@ -8,7 +8,7 @@ const fs = require('fs');
 const http = require('http');
 
 // 和 Android 端保持一致：改仓库地址时两边一起改
-const GITHUB_REPO = 'tomori/nailong-pet';
+const GITHUB_REPO = 'ddyagoo/nailong-pet';
 
 const DESKTOP_DIR = __dirname;
 // 打包后 web 构建会被拷到 resources/app/web；开发时直接用 app/build/web

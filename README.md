@@ -208,21 +208,21 @@ cd desktop; .\run.ps1                          # 从源码跑，第一次会自�
 推送：
 
 ```powershell
-git remote add origin https://github.com/<你的用户名>/nailong-pet.git
+git remote add origin https://github.com/ddyagoo/nailong-pet.git
 git branch -M main
 git push -u origin main
 ```
 
-**应用内更新**：两个端的仓库地址都写死在代码里，换成你自己的（两边要一致）：
+**应用内更新**：仓库地址写在两处，换仓库时两边都要改、保持一致：
 
 ```kotlin
 // app/android/app/src/main/kotlin/com/tomori/nailong_pet/UpdateChecker.kt
-const val REPO = "tomori/nailong-pet"
+const val REPO = "ddyagoo/nailong-pet"
 ```
 
 ```js
 // desktop/main.js
-const GITHUB_REPO = 'tomori/nailong-pet';
+const GITHUB_REPO = 'ddyagoo/nailong-pet';
 ```
 
 - **Android**：首页底部「检查更新」，拉 GitHub Releases 的 latest 比版本号，
