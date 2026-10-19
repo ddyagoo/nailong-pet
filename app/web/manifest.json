@@ -1,0 +1,35 @@
+{
+    "name": "奶龙桌宠",
+    "short_name": "奶龙",
+    "start_url": ".",
+    "display": "standalone",
+    "background_color": "#FFF3DC",
+    "theme_color": "#FFE2BE",
+    "description": "点一下听它播报日期、节日和待办；放着不动它会笑。",
+    "orientation": "portrait-primary",
+    "prefer_related_applications": false,
+    "icons": [
+        {
+            "src": "icons/Icon-192.png",
+            "sizes": "192x192",
+            "type": "image/png"
+        },
+        {
+            "src": "icons/Icon-512.png",
+            "sizes": "512x512",
+            "type": "image/png"
+        },
+        {
+            "src": "icons/Icon-maskable-192.png",
+            "sizes": "192x192",
+            "type": "image/png",
+            "purpose": "maskable"
+        },
+        {
+            "src": "icons/Icon-maskable-512.png",
+            "sizes": "512x512",
+            "type": "image/png",
+            "purpose": "maskable"
+        }
+    ]
+}

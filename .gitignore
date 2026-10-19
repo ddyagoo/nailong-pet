@@ -1,0 +1,31 @@
+# ---- 敏感信息：签名文件与密码，绝不入库 ----
+app/android/key.properties
+app/android/app/*.jks
+app/android/app/*.keystore
+*.jks
+*.keystore
+
+# ---- 构建产物 ----
+app/build/
+app/.dart_tool/
+app/.packages
+app/.flutter-plugins
+app/.flutter-plugins-dependencies
+app/android/.gradle/
+app/android/.kotlin/
+app/android/local.properties
+app/android/app/build/
+dist/
+*.apk
+*.aab
+
+# ---- 素材中间产物（几百 MB，可用 tools/build_assets.py 重建）----
+_work/
+_probe/
+
+# ---- 编辑器 / 系统 ----
+.idea/
+.vscode/
+*.iml
+.DS_Store
+Thumbs.db

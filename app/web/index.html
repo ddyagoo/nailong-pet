@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <base href="$FLUTTER_BASE_HREF">
+
+  <meta charset="UTF-8">
+  <meta content="IE=Edge" http-equiv="X-UA-Compatible">
+  <meta name="description" content="奶龙桌宠：点一下听它播报今天，放久了它会笑。">
+  <meta name="theme-color" content="#FFE2BE">
+
+  <!-- iOS meta tags & icons -->
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="奶龙桌宠">
+  <link rel="apple-touch-icon" href="icons/Icon-192.png">
+
+  <link rel="icon" type="image/png" href="favicon.png"/>
+  <title>奶龙桌宠</title>
+  <link rel="manifest" href="manifest.json">
+
+  <style>
+    html, body {
+      margin: 0;
+      height: 100%;
+      background: #fff3dc;
+      overflow: hidden;
+    }
+    #boot {
+      position: fixed;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 14px;
+      background: radial-gradient(circle at 50% 36%, #fff8ec 0%, #ffe2be 60%, #ffd2a8 100%);
+      transition: opacity .35s ease;
+      z-index: 9;
+      font-family: system-ui, "PingFang SC", "Microsoft YaHei", sans-serif;
+    }
+    #boot.gone { opacity: 0; pointer-events: none; }
+    #boot .dot {
+      width: 54px; height: 54px;
+      border-radius: 50%;
+      background: radial-gradient(circle at 35% 30%, #ffd76a, #f5b93f 70%, #e0992b);
+      box-shadow: 0 8px 22px rgba(224,153,43,.35);
+      animation: bob 1.1s ease-in-out infinite;
+    }
+    #boot p {
+      margin: 0;
+      color: #3e2a1c;
+      font-size: 15px;
+      letter-spacing: .08em;
+      opacity: .75;
+    }
+    @keyframes bob {
+      0%, 100% { transform: translateY(0) scale(1); }
+      45% { transform: translateY(-10px) scale(1.06); }
+      70% { transform: translateY(0) scale(.97); }
+    }
+  </style>
+</head>
+<body>
+  <div id="boot">
+    <div class="dot"></div>
+    <p>奶龙这就来…</p>
+  </div>
+
+  <script src="flutter_bootstrap.js" async></script>
+  <script>
+    function hideBoot() {
+      var boot = document.getElementById('boot');
+      if (!boot || boot.classList.contains('gone')) return;
+      boot.classList.add('gone');
+      setTimeout(function () { boot.remove(); }, 400);
+    }
+    window.addEventListener('flutter-first-frame', hideBoot);
+    // 兜底：万一引擎初始化失败，别让人一直看「奶龙这就来…」
+    setTimeout(function () {
+      var boot = document.getElementById('boot');
+      if (!boot || boot.classList.contains('gone')) return;
+      var p = boot.querySelector('p');
+      if (p) p.textContent = '加载失败了，刷新一下（Ctrl+F5）再试';
+    }, 20000);
+  </script>
+</body>
+</html>
