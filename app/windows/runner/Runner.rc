@@ -89,13 +89,13 @@ BEGIN
     BEGIN
         BLOCK "040904e4"
         BEGIN
-            VALUE "CompanyName", "com.tomori" "\0"
-            VALUE "FileDescription", "nailong_pet" "\0"
+            VALUE "CompanyName", "ddyagoo" "\0"
+            VALUE "FileDescription", "NailongPet desktop pet" "\0"
             VALUE "FileVersion", VERSION_AS_STRING "\0"
             VALUE "InternalName", "nailong_pet" "\0"
-            VALUE "LegalCopyright", "Copyright (C) 2026 com.tomori. All rights reserved." "\0"
+            VALUE "LegalCopyright", "Copyright (C) 2026 ddyagoo" "\0"
             VALUE "OriginalFilename", "nailong_pet.exe" "\0"
-            VALUE "ProductName", "nailong_pet" "\0"
+            VALUE "ProductName", "NailongPet" "\0"
             VALUE "ProductVersion", VERSION_AS_STRING "\0"
         END
     END
