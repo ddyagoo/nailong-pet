@@ -2,10 +2,13 @@
 //
 // 复用 Flutter 的 web 构建：一个透明、无边框、置顶的窗口放奶龙，
 // 另一个普通窗口放设置（就是 Flutter 那套界面）。
-const { app, BrowserWindow, Tray, Menu, ipcMain, screen, shell } = require('electron');
+const { app, BrowserWindow, Tray, Menu, ipcMain, screen, shell, dialog, net } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const http = require('http');
+
+// 和 Android 端保持一致：改仓库地址时两边一起改
+const GITHUB_REPO = 'tomori/nailong-pet';
 
 const DESKTOP_DIR = __dirname;
 // 打包后 web 构建会被拷到 resources/app/web；开发时直接用 app/build/web
@@ -178,6 +181,7 @@ function openSettings() {
 function buildContextMenu() {
   return Menu.buildFromTemplate([
     { label: '打开设置…', click: openSettings },
+    { label: `检查更新…（当前 ${app.getVersion()}）`, click: () => checkUpdate(true) },
     { type: 'separator' },
     {
       label: '显示奶龙',
@@ -205,10 +209,11 @@ function createTray() {
   } catch (_) {
     return;
   }
-  tray.setToolTip('奶龙桌宠');
+  tray.setToolTip(`奶龙桌宠 ${app.getVersion()}`);
   tray.setContextMenu(
     Menu.buildFromTemplate([
       { label: '打开设置…', click: openSettings },
+      { label: `检查更新…（当前 ${app.getVersion()}）`, click: () => checkUpdate(true) },
       {
         label: '显示 / 隐藏奶龙',
         click: () => {
@@ -224,6 +229,102 @@ function createTray() {
   tray.on('click', () => {
     if (petWin) petWin.isVisible() ? petWin.hide() : petWin.show();
   });
+}
+
+// ---------------- 检查更新 ----------------
+
+function parseVersion(v) {
+  const clean = String(v || '').trim().replace(/^v/i, '').split('-')[0];
+  if (!clean) return null;
+  const parts = clean.split('.').map((n) => parseInt(n, 10));
+  return parts.some(Number.isNaN) ? null : parts;
+}
+
+function isNewer(remote, local) {
+  const r = parseVersion(remote);
+  const l = parseVersion(local);
+  if (!r || !l) return false;
+  for (let i = 0; i < Math.max(r.length, l.length); i += 1) {
+    const a = r[i] || 0;
+    const b = l[i] || 0;
+    if (a !== b) return a > b;
+  }
+  return false;
+}
+
+async function checkUpdate(interactive) {
+  const current = app.getVersion();
+  try {
+    const res = await net.fetch(
+      `https://api.github.com/repos/${GITHUB_REPO}/releases/latest`,
+      {
+        headers: {
+          'User-Agent': 'nailong-pet',
+          Accept: 'application/vnd.github+json',
+        },
+      },
+    );
+    if (!res.ok) {
+      if (interactive) {
+        await dialog.showMessageBox({
+          type: 'info',
+          title: '检查更新',
+          message:
+            res.status === 404
+              ? '还没发布过版本（或仓库地址不对）'
+              : `检查失败（HTTP ${res.status}）`,
+        });
+      }
+      return;
+    }
+    const data = await res.json();
+    const tag = String(data.tag_name || data.name || '').trim();
+    if (!isNewer(tag, current)) {
+      if (interactive) {
+        await dialog.showMessageBox({
+          type: 'info',
+          title: '检查更新',
+          message: `已经是最新版本（${current}）`,
+        });
+      }
+      return;
+    }
+
+    // 静默检查时，同一个版本只打扰一次
+    const stateFile = path.join(app.getPath('userData'), 'update-state.json');
+    let prompted = '';
+    try {
+      prompted = JSON.parse(fs.readFileSync(stateFile, 'utf8')).prompted || '';
+    } catch (_) {}
+    if (!interactive && prompted === tag) return;
+    try {
+      fs.writeFileSync(stateFile, JSON.stringify({ prompted: tag }));
+    } catch (_) {}
+
+    const { response } = await dialog.showMessageBox({
+      type: 'info',
+      title: '奶龙桌宠 · 有新版本',
+      message: `发现新版本 ${tag}（当前 ${current}）`,
+      detail: String(data.body || '').slice(0, 400),
+      buttons: ['去 GitHub 下载', '以后再说'],
+      defaultId: 0,
+      cancelId: 1,
+      noLink: true,
+    });
+    if (response === 0) {
+      shell.openExternal(
+        data.html_url || `https://github.com/${GITHUB_REPO}/releases`,
+      );
+    }
+  } catch (_) {
+    if (interactive) {
+      await dialog.showMessageBox({
+        type: 'info',
+        title: '检查更新',
+        message: '检查失败：网络不通，或者仓库地址还没改',
+      });
+    }
+  }
 }
 
 // ---------------- IPC ----------------
@@ -285,6 +386,13 @@ if (!app.requestSingleInstanceLock()) {
     createPetWindow();
     createTray();
 
+    // 启动 8 秒后静默查一次更新，有新版本才弹窗（同一版本只提醒一次）
+    if (!isDemo) {
+      setTimeout(() => {
+        checkUpdate(false);
+      }, 8000);
+    }
+
     if (isDemo) {
       setTimeout(() => {
         if (!petWin) return;
@@ -296,18 +404,35 @@ if (!app.requestSingleInstanceLock()) {
       }, 6000);
       setTimeout(async () => {
         if (!petWin) return;
+        const shotDir = app.getPath('userData');
         const img = await petWin.capturePage();
-        fs.writeFileSync(path.join(__dirname, 'demo-shot.png'), img.toPNG());
+        fs.writeFileSync(path.join(shotDir, 'demo-shot.png'), img.toPNG());
         // 顺手拍一张设置窗口，确认它能正常渲染
         openSettings();
         setTimeout(async () => {
           if (settingsWin) {
             const img2 = await settingsWin.capturePage();
-            fs.writeFileSync(path.join(__dirname, 'demo-settings.png'), img2.toPNG());
+            fs.writeFileSync(path.join(shotDir, 'demo-settings.png'), img2.toPNG());
           }
           app.quit();
         }, 5000);
       }, 9500);
+    }
+
+    // 自检：确认打包后的网络（net.fetch）和版本比较能跑通
+    if (process.argv.includes('--check-update')) {
+      const out = path.join(app.getPath('userData'), 'update-check.json');
+      let text = '';
+      try {
+        const res = await net.fetch(`https://api.github.com/repos/${GITHUB_REPO}/releases/latest`, {
+          headers: { 'User-Agent': 'nailong-pet', Accept: 'application/vnd.github+json' },
+        });
+        text = `status=${res.status} current=${app.getVersion()}`;
+      } catch (e) {
+        text = `error=${e && e.message}`;
+      }
+      fs.writeFileSync(out, text);
+      app.quit();
     }
   });
 

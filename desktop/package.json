@@ -1,15 +1,53 @@
 {
   "name": "nailong-pet-desktop",
-  "productName": "奶龙桌宠",
+  "productName": "NailongPet",
   "version": "0.1.0",
   "private": true,
   "description": "奶龙桌宠 Windows 外壳（透明置顶窗口 + 托盘）",
   "main": "main.js",
   "scripts": {
     "start": "electron .",
-    "demo": "electron . --demo"
+    "demo": "electron . --demo",
+    "dist": "electron-builder --win nsis"
   },
   "devDependencies": {
-    "electron": "^33.2.0"
+    "electron": "^33.2.0",
+    "electron-builder": "^26.15.3"
+  },
+  "build": {
+    "appId": "com.tomori.nailong_pet",
+    "productName": "NailongPet",
+    "directories": {
+      "output": "../dist/windows"
+    },
+    "files": [
+      "main.js",
+      "preload.js",
+      "package.json",
+      "assets/**/*",
+      "web/**/*"
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": ["x64"]
+        }
+      ],
+      "icon": "assets/icon.png",
+      "artifactName": "NailongPet-Setup-${version}.${ext}"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowElevation": true,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "奶龙桌宠",
+      "installerLanguages": ["zh_CN"],
+      "language": "2052",
+      "deleteAppDataOnUninstall": false
+    }
   }
 }

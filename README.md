@@ -6,21 +6,27 @@
 两种形态：
 
 - **Android**：真·桌宠，奶龙浮在任何 App 之上（`dist/NailongPet-arm64.apk`）
-- **Windows**：透明置顶窗口 + 托盘，绿色版免安装（`dist/windows/NailongPet-win-x64.zip`）
+- **Windows**：透明置顶窗口 + 托盘，安装程序（`dist/windows/NailongPet-Setup-0.1.0.exe`）
 - **web**：模拟手机桌面，用来快速看效果（见下面的「跑起来」）
 
 ## 装到电脑上（Windows）
 
-1. 下载 `dist/windows/NailongPet-win-x64.zip`（120MB），解压到任意目录
-2. 双击 `NailongPet.exe`，奶龙出现在屏幕右下角
+1. 下载 `dist/windows/NailongPet-Setup-0.1.0.exe`（95MB），双击安装
+2. 装完自动创建桌面和开始菜单快捷方式「奶龙桌宠」，打开后奶龙出现在屏幕右下角
 
 - **左键拖动**：挪位置
 - **单击**：今日播报
 - **长按**：笑（第三次笑到躺下）
-- **右键**：菜单（打开设置 / 显示隐藏 / 退出）
-- **托盘图标**：同样能打开设置、退出
+- **右键**：菜单（打开设置 / 检查更新 / 显示隐藏 / 退出）
+- **托盘图标**：同样能打开设置、检查更新、退出
 
-设置窗口里改的音量 / 大小 / 静置区间，关掉窗口就会同步到奶龙。卸载 = 删文件夹。
+设置窗口里改的音量 / 大小 / 静置区间，关掉窗口就会同步到奶龙。
+
+**检查更新**：右键或托盘菜单里点「检查更新…」，会去 GitHub Releases 比版本号，
+有新版本弹窗显示更新说明，点「去 GitHub 下载」用浏览器打开下载页。
+启动 8 秒后也会静默查一次，同一个版本只提醒一次。
+
+卸载：Windows 设置 → 应用 → 奶龙桌宠 → 卸载（会保留你的设置）。
 
 > Windows 版是「Flutter web 构建 + Electron 外壳」：界面和逻辑跟手机是同一套 Dart 代码，
 > 透明贴桌面这层由 Electron 做（和 Android 用 Kotlin 悬浮窗是同一个思路）。
@@ -151,20 +157,22 @@ keyAlias=nailong
 
 **这个 keystore 要留着**，以后升级同一个 App 必须用同一把钥匙，否则只能卸载重装。
 
-## 打 Windows 包
+## 打 Windows 安装包
 
 ```powershell
 cd app; flutter build web --release; cd ..     # 先出 web 构建（Electron 加载的就是它）
 cd desktop; .\run.ps1                          # 从源码跑，第一次会自动装 Electron
-.\pack.ps1                                     # 打绿色版：dist/windows/NailongPet-win-x64.zip
+.\pack.ps1                                     # 打安装包：dist/windows/NailongPet-Setup-0.1.0.exe
 ```
 
+- `pack.ps1` 会把 `app/build/web` 同步到 `desktop/web`，再交给 electron-builder 出 NSIS 安装包
+- 安装包是 `oneClick=false`（可以选安装目录）、装完建桌面 + 开始菜单快捷方式，卸载走系统「应用」
 - `desktop/run.ps1` 会检查 `node_modules/electron/dist/electron.exe`，没有就 `npm install`，
   装不上就自动从 npmmirror 拉 zip 解压（国内直连 GitHub 经常失败）
 - 这台机器上跑 Electron 要先 `Remove-Item Env:ELECTRON_RUN_AS_NODE`：如果环境里带了这个变量，
   Electron 会退化成纯 Node，`require('electron')` 拿到的是 npm 包路径而不是 API
-- 绿色版不用装运行时，解压双击 `NailongPet.exe` 即可；exe 图标还是 Electron 默认的
-  （换图标需要 rcedit，没做）
+- electron-builder 首次打包会从 GitHub 下 nsis / 7zip / icons，网络抖的话重跑一次就行
+- 没有代码签名证书，所以 Windows 第一次运行会弹 SmartScreen「未知发布者」，点「仍要运行」
 
 ## Android 的实现说明
 
@@ -195,21 +203,32 @@ git branch -M main
 git push -u origin main
 ```
 
-**应用内更新**：`UpdateChecker.kt` 里写死了仓库地址，改成你自己的：
+**应用内更新**：两个端的仓库地址都写死在代码里，换成你自己的（两边要一致）：
 
 ```kotlin
+// app/android/app/src/main/kotlin/com/tomori/nailong_pet/UpdateChecker.kt
 const val REPO = "tomori/nailong-pet"
 ```
 
-App 首页底部有「检查更新」，点一下拉 GitHub Releases 的 latest，比版本号；
-有新版就弹窗显示 release notes，点「去 GitHub 下载」跳到 release 页面。
+```js
+// desktop/main.js
+const GITHUB_REPO = 'tomori/nailong-pet';
+```
+
+- **Android**：首页底部「检查更新」，拉 GitHub Releases 的 latest 比版本号，
+  有新版弹窗、点按钮跳 release 页面
+- **Windows**：右键菜单 / 托盘「检查更新…」，逻辑一样；启动 8 秒后还会静默查一次，
+  同一个版本只提醒一次
 
 发新版流程：
 
-1. 改 `app/pubspec.yaml` 的 `version: 0.2.0+2`（**+2 是 versionCode，必须递增**）
-2. `tools\build_apk.ps1` 重新打包
-3. GitHub 建一个 tag `v0.2.0` 的 Release，把 APK 传上去
-4. 装旧版的人点「检查更新」就能看到
+1. Android：改 `app/pubspec.yaml` 的 `version: 0.2.0+2`（**+2 是 versionCode，必须递增**），
+   跑 `tools\build_apk.ps1`
+2. Windows：改 `desktop/package.json` 的 `version`，先 `flutter build web --release`，
+   再跑 `desktop\pack.ps1`
+3. GitHub 建一个 tag `v0.2.0` 的 Release，把 `NailongPet-arm64.apk` 和
+   `NailongPet-Setup-0.2.0.exe` 一起传上去
+4. 装旧版的人在 App 里点「检查更新」就能看到
 
 ## 还没做的
 
@@ -217,5 +236,6 @@ App 首页底部有「检查更新」，点一下拉 GitHub Releases 的 latest�
 2. API 26/27 的动画（只有静态帧）
 3. 气泡在奶龙被拖到屏幕顶部时会盖住它（暂时接受）
 4. iOS（系统不允许跨 App 悬浮，只能做 App 内桌宠）
+
 
 
