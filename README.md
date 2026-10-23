@@ -5,17 +5,15 @@
 
 两种形态：
 
-- **Android**：真·桌宠，奶龙浮在任何 App 之上（`NailongPet.apk`）
-- **Windows**：透明置顶窗口 + 托盘，安装程序（`NailongPet-Setup-0.1.0.exe`，82MB）
-- **web**：模拟手机桌面，用来快速看效果（见下面的「跑起来」）
+- **Android**：真·桌宠，奶龙浮在任何 App 之上
+- **Windows**：透明置顶窗口 + 托盘，原生 Flutter，安装包 18MB
 
 **下载**：<https://github.com/ddyagoo/nailong-pet/releases/latest>
-（下面提到的 `dist/` 是本机跑完构建后的产物目录）
 
 ## 装到电脑上（Windows）
 
 1. 从 [Releases](https://github.com/ddyagoo/nailong-pet/releases/latest) 下载
-   `NailongPet-Setup-0.2.0.exe`（18MB），双击安装
+   `NailongPet-Setup-<版本>.exe`（约 18MB），双击安装
 2. 装完自动创建桌面和开始菜单快捷方式「奶龙桌宠」，打开后奶龙出现在屏幕右下角
 
 - **左键拖动**：挪位置
@@ -32,20 +30,20 @@
 
 卸载：Windows 设置 → 应用 → 奶龙桌宠 → 卸载（会保留你的设置）。
 
-> Windows 版是**原生 Flutter**（`flutter build windows`），没有 Electron、没有 Chromium：
-> 窗口尺寸固定，气泡画在窗口里，所以不会出现「气泡一弹奶龙跟着跳」。
-> 透明窗口靠 `flutter_acrylic`，点击穿透靠轮询光标 + `WS_EX_TRANSPARENT`。
+> 第一次运行 Windows 会弹 SmartScreen「未知发布者」（没有代码签名证书），
+> 点「更多信息 → 仍要运行」即可。
+>
+> 桌宠窗口做成透明贴桌面，气泡画在窗口里，所以点它弹播报时奶龙不会上下乱跳；
+> 鼠标只有落在奶龙身上才算点到它，旁边的空白和桌面照常能点。
+>
 > 待办在电脑上读不到系统日历，用的是 App 内的本地清单；
 > **法定节假日/调休和手机一样是在线同步的**，7 天一次，离线用缓存。
 
 ## 装到手机上（Android）
 
 1. 从 [Releases](https://github.com/ddyagoo/nailong-pet/releases/latest) 下载
-   `NailongPet.apk`（61MB，含所有架构），传到手机（数据线 / 微信文件传输都行）
+   `NailongPet.apk`（约 61MB，含所有架构），传到手机（数据线 / 微信文件传输都行）
    后点开安装；系统提示「未知来源」时允许一次。
-
-   > 只提供一个全架构包：之前分开的 arm64 单包在某些系统安装器上会报
-   > 「package info null」，干脆合并成一个，省心。
 2. 打开「奶龙桌宠」，三行权限都点成「已开启」：悬浮窗 / 日历 / 通知
 3. 点 **把奶龙放到桌面**，然后按 Home 回主屏幕，奶龙就在右下角了
 
@@ -58,23 +56,6 @@
 
 停止：打开 App 点「收回奶龙」。
 
-## 跑起来（web）
-
-```powershell
-cd app
-flutter build web --release
-cd build\web
-python -m http.server 8788 --bind 0.0.0.0
-```
-
-- 电脑上打开 <http://127.0.0.1:8788>
-- 想看「第三次笑到躺下」的彩蛋：地址后面加 `?fast=1`，等待时间会被压缩成几秒
-
-开发时热重载：`cd app && flutter run -d chrome`
-
-> 注意：`app/web/flutter_bootstrap.js` 把 CanvasKit 指到了本地 `canvaskit/`。
-> Flutter 默认从 gstatic CDN 下载，网络受限时会一直停在「奶龙这就来…」，别删这个文件。
-
 ## 交互
 
 | 动作 | 结果 |
@@ -84,7 +65,7 @@ python -m http.server 8788 --bind 0.0.0.0
 | 拖动 | 挪位置，贴边吸附，下次打开还在原地；拖动也会重置静置计时 |
 | 静置 | 在设置区间里随机挑一秒笑（默认 30–90 秒），笑完重新计时进入下一轮；第 3 次播放完整彩蛋，然后冷却 5 分钟 |
 | 待机 | 播一整段站立动画，停 0.5–2 秒（设置里可调，上限 10 秒）再播；停顿随机，不是固定周期 |
-| 顶部按钮 | 待办 / 静音 / 设置（音量、奶龙大小、静置区间、振动、大笑开关、回位） |
+| 顶部按钮 | 待办 / 静音 / 设置（音量、奶龙大小、静置区间、眨眼间隔、振动、大笑开关、回位） |
 
 **静置计时的规则**：只有「碰到奶龙」（点它 / 长按 / 拖它）才重新计时。
 在屏幕别的地方操作、切到别的 App，都不影响它——时间到了就笑。
@@ -99,164 +80,14 @@ python -m http.server 8788 --bind 0.0.0.0
 （每年国务院公告后更新，带 gov.cn 原文链接），App 每 7 天自动同步一次到本地；
 同步失败就用构建时内置的 2024–2031 表兜底，离线也能用。
 
-## 目录
+## 还没做的 / 已知限制
 
-```
-app/                 Flutter 工程（web + android + windows）
-  lib/               界面与状态机，见 lib/ 下的注释
-  lib/services/desktop_shell.dart    Windows 原生外壳：透明窗口、托盘、点击穿透、更新
-  lib/services/native_win32.dart     直接 FFI 调的 4 个 user32 函数
-  assets/pet/        idle.webp / laugh.webp / egg.webp（透明动画）
-  assets/audio/      laugh.mp3 / laugh_full.mp3 / tap.wav
-  assets/fonts/      站酷快乐体（OFL）
-  assets/icons/      app_icon.ico（托盘图标）
-  web/               manifest、PWA 图标、启动页、flutter_bootstrap.js
-  windows/           Flutter Windows runner（无边框 / 置顶 / 不进任务栏）
-  android/.../kotlin/com/tomori/nailong_pet/
-    OverlayService.kt   悬浮窗服务（前台服务 + 两个 WindowManager 窗口）
-    PetOverlayView.kt   奶龙本体：AnimatedImageDrawable 播动画、Q 弹、拖动
-    PetBubbleView.kt    播报卡片（native 绘制）
-    BroadcastData.kt    读 calendar.json + 系统日历
-    HolidaySync.kt      节假日在线同步（holiday-cn）
-    UpdateChecker.kt    GitHub Releases 版本检查
-    Prefs.kt            读 Flutter 写的 SharedPreferences（double 是带前缀的字符串）
-  android/app/src/main/assets/calendar.json   2024–2031 的农历/节日/调休表
-desktop/             老的 Electron 外壳（已停用，仅留档）
-tools/               素材与构建
-  build_assets.py    ffmpeg 裁帧 → rembg 抠图 → 拼段 → WebP / 音频
-  make_icons.py      从站立帧生成 App 图标
-  build_apk.ps1      打正式版 APK（会先镜像到 C:\nailong_build 绕开中文路径）
-  build_windows.ps1  打 Windows 原生版（同样镜像到 C:\nailong_build）
-  pack_windows.ps1   NSIS 安装包（用 electron-builder 缓存里的 makensis）
-  installer.nsi      安装包脚本（装到 %LOCALAPPDATA%，建快捷方式 + 卸载项）
-docs/design-spec.md  所有已确认的设计决策（改需求先改这里）
-dist/                打好的 APK、Windows 安装包
-_work/               素材中间产物（可删，删了要重跑 tools/build_assets.py）
-```
+1. 全屏视频 / 游戏时不会自动静音，也不会自动隐藏（现在照常会笑）
+2. Android 8.0/8.1 只有静态帧（系统动画 API 需要 8.1 以上）
+3. 奶龙被拖到屏幕顶部时，气泡会盖住它（暂时接受）
+4. iOS 做不了跨 App 悬浮，只能做 App 内桌宠
 
-## 素材管线
+---
 
-```powershell
-python tools/build_assets.py key     # rembg 抠 521 帧（约 4 分钟）
-python tools/build_assets.py seg     # 拼 idle / laugh / egg
-python tools/build_assets.py webp    # 编码 laugh / egg
-python tools/build_assets.py eyes    # 待机整段（2.93 秒，正放+倒放）
-python tools/build_assets.py audio   # 切笑声、合成点击音
-python tools/make_icons.py           # 生成图标
-python tools/make_notify_icon.py     # 生成通知栏小图标
-cd app && dart run tool/gen_calendar.dart   # 生成 2024–2031 的日历表
-```
-
-源视频路径在 `tools/build_assets.py` 顶部（`VIDEO`）：默认读环境变量 `NAILONG_VIDEO`，
-没设的话找 `_work/source.mp4`。换素材就把录屏放那儿，或者设环境变量。
-
-## 打 APK
-
-```powershell
-powershell -ExecutionPolicy Bypass -File tools\build_apk.ps1
-```
-
-为什么要镜像到 `C:\nailong_build`：项目在中文路径下，Dart 的 AOT 快照器会报
-`Unable to read file ... app.dill`，Gradle 里已经用 `android.overridePathCheck=true`
-绕过了 AGP 的检查，但 AOT 这一步只能靠纯英文路径。
-
-签名用的是 `android/app/nailong-release.jks`，密码写在 `android/key.properties`
-（**这个文件和 `.jks` 都不进仓库**，格式是三行）：
-
-```
-storePassword=<你自己的密码>
-keyPassword=<你自己的密码>
-keyAlias=nailong
-```
-
-**keystore 和密码都要另存一份备份**：以后升级同一个 App 必须用同一把钥匙，
-丢了就只能换包名重新发，老用户也收不到更新了。
-
-## 打 Windows 安装包
-
-```powershell
-powershell -File tools\build_windows.ps1   # flutter build windows --release，产物到 dist\windows\app
-powershell -File tools\pack_windows.ps1    # NSIS 安装包：dist\windows\NailongPet-Setup-0.2.0.exe
-```
-
-- 两步都要**在纯英文路径的镜像里编译**：中文路径会让 Dart 的 AOT 快照器报
-  `Unable to read file ... app.dill`，所以脚本会先 robocopy 到 `C:\nailong_build\app`（`/MIR`，
-  顺手清掉源码里已删除的旧素材），编译完再拷回 `dist\windows\app`
-- `makensis` 也不认中文路径：`pack_windows.ps1` 会把 `.nsi`、图标先拷到 `C:\nailong_build` 再编译，
-  产物出到那边后拷回 `dist\windows`。makensis 直接用 electron-builder 缓存里的那份
-  （`%LOCALAPPDATA%\electron-builder\Cache\nsis-3.0.4.1\...`），**不用额外装 Inno Setup**
-- 安装包体积约 **18MB**（`flutter_windows.dll` 19.8MB + `app.so` 5.3MB + 素材 9MB，LZMA 压到 45%）
-- 装到 `%LOCALAPPDATA%\Programs\NailongPet`，建桌面 + 开始菜单快捷方式，卸载项写在 HKCU
-- 没有代码签名证书，所以 Windows 第一次运行会弹 SmartScreen「未知发布者」，点「仍要运行」
-- ⚠️ `windows/runner/*.cpp` **只能写 ASCII 注释**：MSVC 按代码页 936 解析非 ASCII 源码，
-  会报 C4819 并把后面的声明吞掉
-- 老的 Electron 外壳还在 `desktop/` 里，已经不再打包；确认原生版稳定后可以整个删掉
-
-## Android 的实现说明
-
-- 悬浮窗用 `TYPE_APPLICATION_OVERLAY`，宠物窗口接收触摸，气泡窗口不抢焦点
-- 动画直接用 `AnimatedImageDrawable` 播 WebP（API 28+）；API 26/27 会退化成静态首帧
-- 气泡窗口如果加 `FLAG_NOT_TOUCHABLE`，Android 12+ 会把窗口 alpha 压到 0.8 导致卡片发灰，
-  所以改成可点击（点一下就收起）
-- 日期/农历/节气来自构建期生成的 `calendar.json`（用同一个 lunar 包算的，和 web 一致），
-  避免在 Kotlin 里重写一遍农历算法；法定节假日优先用在线同步的数据覆盖
-- 待办读 `CalendarContract.Instances`，查今天起 4 天、最多 9 条
-- App 自己的界面在前台时会调 `OverlayService.setAppForeground(true)` 把奶龙收起来
-- 宠物窗口比奶龙本身大 1.22 倍，Q 弹放大时头顶才不会被窗口裁掉
-
-## 发到 GitHub / 应用内更新
-
-仓库：<https://github.com/ddyagoo/nailong-pet>（**必须是 public**，自动更新走匿名 API，
-私有仓库会让「检查更新」一直 404）
-
-`.gitignore` 排除了：
-
-- `app/android/key.properties`、`*.jks`（签名密码，**千万别传**）
-- `dist/`、`*.apk`（APK 走 GitHub Releases）
-- `_work/`、`_probe/`（几百 MB 的素材中间产物）
-- `app/build/`、`.dart_tool/`、`.gradle/` 等构建目录
-
-推新提交：
-
-```powershell
-git add -A
-git commit -m "改了什么"
-git push
-```
-
-**应用内更新**：仓库地址写在两处，fork 到别的账号时两边都要改、保持一致：
-
-```kotlin
-// app/android/app/src/main/kotlin/com/tomori/nailong_pet/UpdateChecker.kt
-const val REPO = "ddyagoo/nailong-pet"
-```
-
-```js
-// desktop/main.js
-const GITHUB_REPO = 'ddyagoo/nailong-pet';
-```
-
-- **Android**：首页底部「检查更新」，拉 GitHub Releases 的 latest 比版本号，
-  有新版弹窗、点按钮跳 release 页面
-- **Windows**：右键菜单 / 托盘「检查更新…」，逻辑一样；启动 8 秒后还会静默查一次，
-  同一个版本只提醒一次
-
-发新版流程：
-
-1. Android：改 `app/pubspec.yaml` 的 `version: 0.2.0+2`（**+2 是 versionCode，必须递增**），
-   跑 `tools\build_apk.ps1`
-2. Windows：改 `desktop/package.json` 的 `version`，先 `flutter build web --release`，
-   再跑 `desktop\pack.ps1`
-3. GitHub 建一个 tag `v0.2.0` 的 Release，把 `NailongPet.apk` 和
-   `NailongPet-Setup-0.2.0.exe` 一起传上去
-4. 装旧版的人在 App 里点「检查更新」就能看到
-
-## 还没做的
-
-1. 全屏视频 / 游戏时自动静音（现在是照常会笑）
-2. API 26/27 的动画（只有静态帧）
-3. 气泡在奶龙被拖到屏幕顶部时会盖住它（暂时接受）
-4. iOS（系统不允许跨 App 悬浮，只能做 App 内桌宠）
-
-
-
+> 这个仓库只放能运行的成品和说明。构建、素材管线、发版流程这些开发细节
+> 属于本地维护事项，不在仓库里。

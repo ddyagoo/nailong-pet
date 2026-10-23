@@ -121,8 +121,6 @@ lib/
 | 设置共享 | 读 Flutter 的 `FlutterSharedPreferences`（double 带 `VGhpcyBpcyB0aGUgcHJlZml4IGZvciBEb3VibGUu` 前缀） |
 | App 在前台 | 调 `OverlayService.setAppForeground(true)` 把奶龙收起来，避免挡住自己的设置面板 |
 | 气泡透明度 | 不能加 `FLAG_NOT_TOUCHABLE`（Android 12+ 会强制 alpha 0.8 导致发灰），改成可点击 |
-| 签名 | `android/app/nailong-release.jks` + `key.properties`，release 构建自动使用 |
-| 构建 | `tools/build_apk.ps1`：先镜像到 `C:\nailong_build`（中文路径会让 AOT 快照器报错）再编 |
 
 产物：`dist/NailongPet.apk`（61MB，全架构单包；不再单独出 arm64）。
 
@@ -135,18 +133,15 @@ lib/
 |---|---|
 | 框架 | `app/windows/` runner：`WS_POPUP` 无边框、`WS_EX_TOOLWINDOW` 不进任务栏、置顶 |
 | 透明 | `flutter_acrylic` 的 `WindowEffect.transparent`（`SetWindowCompositionAttribute`）。**原生 Flutter 的交换链是不透明的**，只靠 DWM 玻璃会得到纯黑底，必须走这个 API |
-| 气泡 | 单窗口固定 420×820，气泡画在窗口内 → **不再改窗口尺寸，乱跳问题从架构上消失** |
-| 拖动 | `window_manager.startDragging()`；位置存 `%LOCALAPPDATA%\NailongPet\window.txt` |
-| 点击穿透 | 80ms 轮询 `GetCursorPos`，光标不在「奶龙 ∪ 气泡」矩形里就给窗口加 `WS_EX_TRANSPARENT`（只用到 4 个 user32 函数，直接 FFI，不依赖 win32 包） |
+| 气泡 | 单窗口固定 420×660 逻辑像素，气泡画在窗口内 → **不再改窗口尺寸，乱跳问题从架构上消失** |
+| 拖动 | `window_manager.startDragging()`，窗口位置本地记住 |
+| 点击穿透 | `SetWindowRgn` 把窗口裁成可点区域：待机时用 idle 首帧的 alpha 生成列剪影（放大 1.26 覆盖 Q 弹），笑的时候用整块。区域外点击直接落给桌面 |
 | 托盘 | `tray_manager`：显示/隐藏、检查更新、退出；右键奶龙弹同一份菜单 |
 | 更新 | `lib/services/update_service.dart`：`http` 拉 Releases + `package_info_plus` 比版本，`url_launcher` 打开下载页 |
-| 打包 | NSIS（`tools/installer.nsi`，用 electron-builder 缓存里的 `makensis`，不装 Inno Setup），装到 `%LOCALAPPDATA%\Programs\NailongPet` |
-| 构建 | `tools/build_windows.ps1` 先镜像到 `C:\nailong_build`（中文路径同样会让 AOT 挂），makensis 也只认英文路径 |
+| 打包 | NSIS（`tools/installer.nsi`），装到 `%LOCALAPPDATA%\Programs\NailongPet` |
+| 退出 | 发 `WM_CLOSE` 走正常关闭流程；`window_manager.destroy()` 会等插件逐个收尾，实测卡 15 秒 |
 
-产物：`dist/windows/NailongPet-Setup-0.2.0.exe`（18MB）。
-
-坑：`windows/runner/*.cpp` **只能写 ASCII 注释**——MSVC 按代码页 936 解析，非 ASCII 会报
-C4819 并把后面的声明吞掉，症状是「style 未声明的标识符」。
+产物：`dist/windows/NailongPet-Setup-<版本>.exe`（18MB）。
 
 ## 7. 已知限制
 
